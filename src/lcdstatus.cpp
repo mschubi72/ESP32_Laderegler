@@ -18,7 +18,10 @@ void LcdStatus::setupLCD()
   u8g2.setFont(u8g2_font_ncenB10_tr);
   u8g2.drawStr(6, 27, "ESP Lader ready...");
   u8g2.drawStr(6, 47, String("IP: " + WiFi.localIP().toString()).c_str());
+  u8g2.drawStr(6, 59, __DATE__);
   u8g2.sendBuffer();
+  Serial.println("LcdStatus initialized...");
+    Serial.printf("\tSCL Pin: %i, SDA Pin: %i \n", PIN_OLED_SCL, PIN_OLED_SDA);
 }
 
 void LcdStatus::updateFullScreen()

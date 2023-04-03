@@ -15,6 +15,8 @@ DS18B20Stat::DS18B20Stat(State *state)
 void DS18B20Stat::setupSensors()
 {
     oneWireSensors.begin();
+    Serial.println("DS18B20Stat initialized...");
+    Serial.printf("\tOneWire DATA Pin: %i \n", SENSOR_DATA_PIN);
 }
 
 void DS18B20Stat::updateTemperature()

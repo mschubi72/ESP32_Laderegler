@@ -28,4 +28,6 @@ void setupOTA(const char *HOSTNAME, const uint16_t OTA_PORT)
             Serial.println("End Failed");
     });
     ArduinoOTA.begin();
+    Serial.println("OTA initialized...");
+    Serial.printf("\tHost: %s, Port: %i \n", HOSTNAME, OTA_PORT);
 }
