@@ -1,42 +1,35 @@
 #include "main.h"
 #include "lcdstatus.h"
 #include "ds18b20stat.h"
+#include "ads1115.h"
 
 #include <esp_task_wdt.h>
 
 using namespace std;
 
-//#define DEBUG //"Schalter" zum aktivieren
-
-#ifdef DEBUG
-#define DEBUG_PRINT(x) Serial.print(x)
-#define DEBUG_PRINTLN(x) Serial.println(x)
-#else
-#define DEBUG_PRINT(x)
-#define DEBUG_PRINTLN(x)
-#endif
-
-#define WDT_TIMEOUT 5 //5 seconds WDT
+#define WDT_TIMEOUT 5 // 5 seconds WDT
 
 String phoneNumber = PHONENUMBER;
 String apiKey = APIKEY;
 
 State currentState;
 
-
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
+Ticker temperatureTimer;
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
-LcdStatus lcdstatus=NULL;
-DS18B20Stat ds18b20status=NULL;
+LcdStatus lcdstatus = NULL;
+DS18B20Stat ds18b20status = NULL;
+Ads1115 ads1115 = NULL;
 
-void sendMessage(String message){
+void sendMessage(String message)
+{
 
   // Data to send with HTTP POST
-  String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);    
+  String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
   Serial.println("Message URL:");
   Serial.println(url);
 
@@ -45,13 +38,15 @@ void sendMessage(String message){
 
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  
+
   // Send HTTP POST request
   int httpResponseCode = http.POST(url);
-  if (httpResponseCode == 200){
+  if (httpResponseCode == 200)
+  {
     Serial.println("Message sent successfully");
   }
-  else{
+  else
+  {
     Serial.println("Error sending the message");
     Serial.print("HTTP response code: ");
     Serial.println(httpResponseCode);
@@ -61,10 +56,11 @@ void sendMessage(String message){
   http.end();
 }
 
-void toggleRelayPowerIn(){
+void toggleRelayPowerIn()
+{
 
   // Data to send with HTTP POST
-  String url = "http://192.168.1.87/switch/lader-power_relay_in/toggle";    
+  String url = "http://192.168.1.87/switch/lader-power_relay_in/toggle";
   Serial.println("Message URL:");
   Serial.println(url);
 
@@ -73,13 +69,15 @@ void toggleRelayPowerIn(){
 
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  
+
   // Send HTTP POST request
   int httpResponseCode = http.POST(url);
-  if (httpResponseCode == 200){
+  if (httpResponseCode == 200)
+  {
     Serial.println("Message sent successfully");
   }
-  else{
+  else
+  {
     Serial.println("Error sending the message");
     Serial.print("HTTP response code: ");
     Serial.println(httpResponseCode);
@@ -88,8 +86,6 @@ void toggleRelayPowerIn(){
   // Free resources
   http.end();
 }
-
-
 
 void onWiFiEvent(WiFiEvent_t event)
 {
@@ -179,12 +175,12 @@ void processStateJson(char *topic, char *payload)
   DEBUG_PRINTLN(topic);
   DEBUG_PRINT("Payload: ");
   DEBUG_PRINTLN(payload);
- 
+
   // JsonObject& root = jsonBuffer.parseObject(payload);
-  if (strcmp(topic, MQTT_TOPIC_SENSOR) == 0) //Powermeter
+  if (strcmp(topic, MQTT_TOPIC_SENSOR) == 0) // Powermeter
   {
-   //Serial.println("*** Powermeter ***");
-  
+    // Serial.println("*** Powermeter ***");
+
     auto error = deserializeJson(jsonBuffer, payload);
     if (error)
     {
@@ -203,19 +199,20 @@ void processStateJson(char *topic, char *payload)
     if (root.containsKey("SGMDD"))
     {
       int16_t watt = root["SGMDD"]["Momentan"].as<int16_t>();
-      //Serial.println("Momentanverbrauch: " + String(watt));
+      // Serial.println("Momentanverbrauch: " + String(watt));
       currentState.flatPower = watt;
       currentState.processed = false;
     }
   }
-  else if (strcmp(topic, MQTT_TOPIC_SOLAR) == 0) //Solarpower
+  else if (strcmp(topic, MQTT_TOPIC_SOLAR) == 0) // Solarpower
   {
-    //Serial.println("*** Solarpower ***");
+    // Serial.println("*** Solarpower ***");
     int16_t watt = atoi(payload);
-      //Serial.println("Solarleistung: " + String(watt));
-      currentState.solarPower = watt;
+    // Serial.println("Solarleistung: " + String(watt));
+    currentState.solarPower = watt;
   }
-  else{
+  else
+  {
     Serial.print("*** Unknown Topic ***");
     Serial.println(topic);
   }
@@ -328,56 +325,57 @@ void setup()
   pinMode(22, OUTPUT);
 
   Serial.begin(MONITOR_BAUDRATE);
- Serial.print("Reset/Boot Reason was: "); 
-    esp_reset_reason_t reason = esp_reset_reason();
-    switch (reason) {
-        case ESP_RST_UNKNOWN:
-          Serial.println("Reset reason can not be determined");
-        break;
+  Serial.print("Reset/Boot Reason was: ");
+  esp_reset_reason_t reason = esp_reset_reason();
+  switch (reason)
+  {
+  case ESP_RST_UNKNOWN:
+    Serial.println("Reset reason can not be determined");
+    break;
 
-        case ESP_RST_POWERON:
-          Serial.println("Reset due to power-on event");
-        break;
+  case ESP_RST_POWERON:
+    Serial.println("Reset due to power-on event");
+    break;
 
-        case ESP_RST_EXT:
-          Serial.println("Reset by external pin (not applicable for ESP32)");
-        break;
+  case ESP_RST_EXT:
+    Serial.println("Reset by external pin (not applicable for ESP32)");
+    break;
 
-        case ESP_RST_SW:
-          Serial.println("Software reset via esp_restart");
-        break;
+  case ESP_RST_SW:
+    Serial.println("Software reset via esp_restart");
+    break;
 
-        case ESP_RST_PANIC:
-          Serial.println("Software reset due to exception/panic");
-        break;
+  case ESP_RST_PANIC:
+    Serial.println("Software reset due to exception/panic");
+    break;
 
-        case ESP_RST_INT_WDT:
-          Serial.println("Reset (software or hardware) due to interrupt watchdog");
-        break;
+  case ESP_RST_INT_WDT:
+    Serial.println("Reset (software or hardware) due to interrupt watchdog");
+    break;
 
-        case ESP_RST_TASK_WDT:
-          Serial.println("Reset due to task watchdog");
-        break;
+  case ESP_RST_TASK_WDT:
+    Serial.println("Reset due to task watchdog");
+    break;
 
-        case ESP_RST_WDT:
-          Serial.println("Reset due to other watchdogs");
-        break;                                
+  case ESP_RST_WDT:
+    Serial.println("Reset due to other watchdogs");
+    break;
 
-        case ESP_RST_DEEPSLEEP:
-          Serial.println("Reset after exiting deep sleep mode");
-        break;
+  case ESP_RST_DEEPSLEEP:
+    Serial.println("Reset after exiting deep sleep mode");
+    break;
 
-        case ESP_RST_BROWNOUT:
-          Serial.println("Brownout reset (software or hardware)");
-        break;
-        
-        case ESP_RST_SDIO:
-          Serial.println("Reset over SDIO");
-        break;
-        
-        default:
-        break;
-    }
+  case ESP_RST_BROWNOUT:
+    Serial.println("Brownout reset (software or hardware)");
+    break;
+
+  case ESP_RST_SDIO:
+    Serial.println("Reset over SDIO");
+    break;
+
+  default:
+    break;
+  }
 
   Serial.println("Booting setup...");
 
@@ -391,21 +389,6 @@ void setup()
   connectToWiFi();
 
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
-
-  Serial.print("MOSI: ");
-  Serial.println(MOSI);
-  Serial.print("MISO: ");
-  Serial.println(MISO);
-  Serial.print("SCK: ");
-  Serial.println(SCK);
-  Serial.print("SS: ");
-  Serial.println(SS);
-
-  Serial.print("SDA: ");
-  Serial.println(SDA);
-  Serial.print("SCL: ");
-  Serial.println(SCL);
-
   timeClient.begin();
 
   Serial.println("Ready");
@@ -428,12 +411,14 @@ void setup()
   lcdstatus.setupLCD();
   ds18b20status = DS18B20Stat(&currentState);
   ds18b20status.setupSensors();
+  ads1115 = Ads1115(&currentState);
+  ads1115.setupADS();
+  // temperatureTimer.attach(45.0,ds18b20status.updateTemperature);
   analogReadResolution(12);
   analogSetWidth(12);
 
-  
-  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
-  esp_task_wdt_add(NULL); //add current thread to WDT watch
+  esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL);               // add current thread to WDT watch
   // Send Message to WhatsAPP
   sendMessage("Hello from ESP32!");
   // Send Message to WhatsAPP
@@ -444,19 +429,33 @@ void setup()
   esp_task_wdt_reset();
   sendMessage(String("Laderegler hat nun IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
+
 }
 
 // the loop function runs over and over again forever
 int tickerC = 0;
+int minutes = 0;
+int seconds = 0;
+float voltBat = 0.0;
+
 void loop()
 {
- esp_task_wdt_reset();
- ds18b20status.updateTemperature();
- 
-  if(tickerC > 0) tickerC--;
-
-  if(tickerC == 0 && currentState.flatPower > 1500){
-    tickerC = 60*10; // 10 Minuten
+  timeClient.update();
+  esp_task_wdt_reset();
+  minutes = timeClient.getMinutes();
+  seconds = timeClient.getSeconds();
+  if (minutes % 2 == 0 && seconds < 2)
+  {
+    ds18b20status.updateTemperature();
+    ads1115.updateVoltage();
+  
+  }
+  
+  if (tickerC > 0)
+    tickerC--;
+  if (tickerC == 0 && currentState.flatPower > 1500)
+  {
+    tickerC = 60 * 10; // 10 Minuten
     esp_task_wdt_reset();
     Serial.println("Stromover1");
     Serial.println(currentState.flatPower);
@@ -467,110 +466,10 @@ void loop()
   }
   ArduinoOTA.handle();
   lcdstatus.updateHeaderStatus();
-//toggleRelayPowerIn();
- esp_task_wdt_reset();
- 
-  /*
-    u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB12_tr);
-  timeClient.update();
-  u8g2.drawStr(6, 16, timeClient.getFormattedTime().c_str());
-  u8g2.sendBuffer();
-String a;
-Serial2.print(":01r10=0,\r\n");
-delay(50);
-while(Serial2.available()) {
-  a= Serial2.readString();// read the incoming data as string
-  Serial.println(a);
-}
-Serial2.print(":01r11=0,\r\n");
-delay(50);
-while(Serial2.available()) {
-  a= Serial2.readString();// read the incoming data as string
-  Serial.println(a);
-}
-Serial2.print(":01r30=0,\r\n");
-delay(50);
-while(Serial2.available()) {
-  a= Serial2.readString();// read the incoming data as string
-  Serial.println(a);
-}
-Serial2.print(":01r31=0,\r\n");
-delay(50);
-while(Serial2.available()) {
-  a= Serial2.readString();// read the incoming data as string
-  Serial.println(a);
-}
-  // u8g2.clearBuffer();
-  // u8g2.setFont(u8g2_font_ncenB12_tr);
-  // u8g2.drawStr(0, 12, "Hello World!");
-  // u8g2.setFont(u8g2_font_ncenB10_tr);
-  // u8g2.drawStr(0,22, String("IP: " + WiFi.localIP().toString()).c_str() );
-  // u8g2.setCursor(0,40);
-  // u8g2.print(WiFi.localIP());
-  // timeClient.update();
+  // toggleRelayPowerIn();
+  esp_task_wdt_reset();
 
-  Serial.println(timeClient.getFormattedTime());
-  // u8g2.setFont(u8g2_font_ncenB12_tr);
-  // u8g2.drawStr(6, 16, timeClient.getFormattedTime().c_str());
-  // u8g2.sendBuffer();
-  // u8g2.drawXBM( 116, 52, u8g_logo_width, u8g_logo_height, image_bits3);
-  /*
-  u8g2.setFont(u8g2_font_unifont_t_symbols);
-  for (int x = 0x2100; x < 0x2740; x = x + 16)
-  {
-    u8g2.clearBuffer();
-    for (int y = 0; y < 8; y++)
-    {
-      u8g2.drawGlyph(16 * y, 30, x + y);
-      u8g2.drawGlyph(16 * y, 50, x + 8 + y);
-    }
-    u8g2.sendBuffer();
-    delay(150);
-  }
-  */
-  // u8g2.drawGlyph(6, 50, 0x2603);	/* dec 9731/hex 2603 Snowman
-  // u8g2.drawGlyph(120, 27, 0x21af);	/* Blitz */
-  /*
-    u8g2.setFont(u8g2_font_unifont_t_emoticons);
-    for (int x = 0x0020; x < 0x0100; x = x + 16)
-    {
-      u8g2.clearBuffer();
-      for (int y = 0; y < 8; y++)
-      {
-        u8g2.drawGlyph(16 * y, 30, x + y);
-        u8g2.drawGlyph(16 * y, 50, x + 8 + y);
-      }
-      u8g2.sendBuffer();
-      delay(150);
-    }
-    ////
-    //  u8g2.drawGlyph(26, 50, 0x0031);	/* Smiley
-
-    u8g2.setFont(u8g2_font_battery19_tn);
-    u8g2.drawGlyph(46, 50, 0x0030);  /* Akku /
-    u8g2.drawGlyph(57, 50, 0x0031);  /* Akku /
-    u8g2.drawGlyph(68, 50, 0x0032);  /* Akku /
-    u8g2.drawGlyph(79, 50, 0x0033);  /* Akku /
-    u8g2.drawGlyph(90, 50, 0x0034);  /* Akku /
-    u8g2.drawGlyph(101, 50, 0x0035); /* Akku /
-    u8g2.drawGlyph(112, 50, 0x0035); /* Akku /
-    u8g2.setFont(u8g2_font_unifont_t_weather);
-    u8g2.drawGlyph(6, 64, 0x0033);  /* Sonne /
-    u8g2.drawGlyph(25, 64, 0x0034); /* Sonne /
-    u8g2.drawGlyph(42, 64, 0x0035); /* Sonne /
-
-    u8g2.sendBuffer();
-
-    digitalWrite(22, HIGH); // turn the LED on
-    delay(500);             // wait for 500 milliseconds
-    digitalWrite(22, LOW);  // turn the LED off
-    delay(1500);            // wait for 500 milliseconds
-    u8g2.clearBuffer();
-    digitalWrite(22, HIGH);
-    // u8g2.drawXBM( 116, 52, u8g_logo_width, u8g_logo_height, image_bits4);
-    delay(500);
-    digitalWrite(22, LOW);
-    */
+  Serial.print(timeClient.getFormattedTime());
+  Serial.println(" UTC");
   delay(1000);
 }

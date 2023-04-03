@@ -8,6 +8,16 @@
 // There are not many reasons to change this
 #define MONITOR_BAUDRATE 115200
 
+// #define DEBUG //"Schalter" zum aktivieren
+
+#ifdef DEBUG
+#define DEBUG_PRINT(x) Serial.print(x)
+#define DEBUG_PRINTLN(x) Serial.println(x)
+#else
+#define DEBUG_PRINT(x)
+#define DEBUG_PRINTLN(x)
+#endif
+
 // Examle WiFi Connection information
 //#define WIFI_SSID "My-SID"
 //#define WIFI_PASSWORD "My_PW"
@@ -43,8 +53,12 @@ const uint16_t OTA_PORT = 3232;
 #define SENSOR_DATA_PIN 14
 
 // I2C Pins for OLED Display
-#define PIN_OLED_SCL 4
-#define PIN_OLED_SDA 0
+#define PIN_OLED_SCL 22
+#define PIN_OLED_SDA 21  //0
+
+// I2C Pins for ADS1115 Display
+#define PIN_ADS_SCL 4
+#define PIN_ADS_SDA 2 
 
 #define u8g_logo_width 12
 #define u8g_logo_height 12
