@@ -1,8 +1,7 @@
 #ifndef DPM8624_H
 #define DPM8624_H
 
-#include <Arduino.h>
-#include "Configuration.h"
+#include "main.h"
 
 // class uses Serial2 for dpm8624 communication
 // Serial2 must be initialized before using this class
@@ -10,31 +9,33 @@
 // all settings has to be check via getMethods...
 // setMethods set the Values directly via RS485
 // commands wait 50ms after execution
-class DPM8624
+class Dpm8624
 {
 private:
-    const String CMD_SET_VOLTAGE = ":01w10=";
-    const String CMD_SET_CURRENT = "";
-    const String CMD_SET_VOLTAGE_AND_CURRENT = ":01w20=";
-    const String CMD_ENABLE_OUTPUT = "";
+    static const char* CMD_SET_VOLTAGE;
+    static const char* CMD_SET_CURRENT;
+    static const char* CMD_SET_VOLTAGE_AND_CURRENT;
+    static const char* CMD_ENABLE_OUTPUT;
 
-    const String CMD_GET_CURRENT_VOLTAGE = "";
-    const String CMD_GET_VOLTAGE_PROG = "";
-    const String CMD_GET_CURRENT_PROG = "";
-    const String CMD_GET_VOLTAGE_OUT = "";
-    const String CMD_GET_CURRENT_OUT = "";
-    const String CMD_GET_CC_CV_MODE = "";
-    const String CMD_GET_OUTPUT_ENABLED = "";
+    static const char* CMD_GET_CURRENT_VOLTAGE;
+    static const char* CMD_GET_VOLTAGE_PROG;
+    static const char* CMD_GET_CURRENT_PROG;
+    static const char* CMD_GET_VOLTAGE_OUT;
+    static const char* CMD_GET_CURRENT_OUT;
+    static const char* CMD_GET_CC_CV_MODE;
+    static const char* CMD_GET_OUTPUT_ENABLED;
 
+    State *status;
     String s_cmd;
-    u_int i_current;
-    u_int i_voltage;
+    u_int i_current = 0;
+    u_int i_voltage = 0;
 
 public:
+    Dpm8624(State *state);
+
     // max. 60V, 24A, Settings in mV an mA)
     // are values out of specs, nothing happens
-    DPM8624(u_int initialVoltage_mV, u_int initialCurrent_mA);
-
+    void setupDPM(u_int initialVoltage_mV, u_int initialCurrent_mA);
     void setCurrent(u_int newCurrent_mA);
     void setVoltage(u_int newVoltage_mV);
     void setVoltageCurrent(u_int newCurrent_mA, u_int newVoltage_mV);
