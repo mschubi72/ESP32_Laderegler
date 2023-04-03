@@ -42,7 +42,8 @@ const uint16_t OTA_PORT = 3232;
 //#define MQTT_TOPIC_COMMAND reporting status
 #define MQTT_TOPIC_AVAILABLE "esp32lader/status"
 
-
+#define DEFAULT_BAT_VOLTAGE 29400   //mV
+#define DEFAULT_BAT_CURRENT 100     //mA
 
 
 // Port for RS485 Communication to DPM8624
@@ -62,6 +63,13 @@ const uint16_t OTA_PORT = 3232;
 
 #define u8g_logo_width 12
 #define u8g_logo_height 12
+
+//intervals for actions in seconds
+#define INTERVAL_ASK_TEMPERATURE   60
+#define INTERVAL_ASK_BAT_VOLTAGE   10
+#define INTERVAL_REFRESH_DISPLAY   2
+#define INTERVAL_PROCESS_ACTION    10
+
 
 static unsigned char image_bits1[] = {
  0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,
