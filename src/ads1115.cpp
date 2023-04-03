@@ -19,9 +19,10 @@ void Ads1115::setupADS()
     ads.begin();
     ads.setGain(1);     // 6.144 volt
     ads.setDataRate(0); // medium
-
     // single shot mode
     ads.setMode(1);
+    Serial.println("ADS1115 initialized...");
+    Serial.printf("\tSDA Pin: %i, SCL Pin: %i \n", PIN_ADS_SDA, PIN_ADS_SCL);
 }
 
 void Ads1115::updateVoltage()
