@@ -2,6 +2,7 @@
 #include "lcdstatus.h"
 #include "ds18b20stat.h"
 #include "ads1115.h"
+#include "dpm8624.h"
 
 #include <esp_task_wdt.h>
 
@@ -24,6 +25,7 @@ NTPClient timeClient(ntpUDP);
 LcdStatus lcdstatus = NULL;
 DS18B20Stat ds18b20status = NULL;
 Ads1115 ads1115 = NULL;
+Dpm8624 dpm8624 = NULL;
 
 void sendMessage(String message)
 {
@@ -95,13 +97,13 @@ void onWiFiEvent(WiFiEvent_t event)
     Serial.println("WIFI: Connecting...");
     break;
   case SYSTEM_EVENT_STA_CONNECTED:
-    Serial.println("WIFI: Connected! Waiting for IP...");
+    // Serial.println("WIFI: Connected! Waiting for IP...");
     break;
   case SYSTEM_EVENT_STA_LOST_IP:
     Serial.println("WIFI: Lost IP address...");
     break;
   case SYSTEM_EVENT_STA_GOT_IP:
-    Serial.println("WIFI: Got IP!");
+    // Serial.println("WIFI: Got IP!");
     Serial.print("WIFI: IP Address: ");
     Serial.println(WiFi.localIP());
     connectToMQTT();
@@ -124,7 +126,7 @@ void connectToWiFi()
   if (WiFi.status() == WL_CONNECTED)
     return;
 
-  Serial.println("WIFI: Connecting to WiFi...");
+  // Serial.println("WIFI: Connecting to WiFi...");
   WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
@@ -325,6 +327,9 @@ void setup()
   pinMode(22, OUTPUT);
 
   Serial.begin(MONITOR_BAUDRATE);
+  Serial.println("\n\n--------------------------------------------------------------------------");
+  Serial.printf("Serial initialized...\n\tRX Pin: %i, TX Pin: %i \n", RX, TX);
+
   Serial.print("Reset/Boot Reason was: ");
   esp_reset_reason_t reason = esp_reset_reason();
   switch (reason)
@@ -377,7 +382,7 @@ void setup()
     break;
   }
 
-  Serial.println("Booting setup...");
+  Serial.printf("\nBooting setup Version: %s / %s\n", __DATE__, __TIME__);
 
   setupRS485();
   WiFi.onEvent(onWiFiEvent);
@@ -391,22 +396,16 @@ void setup()
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
   timeClient.begin();
 
-  Serial.println("Ready");
-  Serial.print("IP address: ");
   // Serial.println(WiFi.localIP());
 
-  Serial.println("---");
-  Serial.println("init Serial 2...");
-
-  Serial.println("Serial Txd is on pin: " + String(TX));
-  Serial.println("Serial Rxd is on pin: " + String(RX));
-
-  Serial.println("Write Spannung");
-  // Serial2.print(":01w10=1234,\r\n");
-  Serial2.print(":01w20=1450,5000,\r\n");
-  delay(50);
-  Serial2.print(":01w12=1,\r\n");
-  Serial.println("written???");
+  // Serial.println("Write Spannung");
+  //  Serial2.print(":01w10=1234,\r\n");
+  // Serial2.print(":01w20=1450,5000,\r\n");
+  // delay(50);
+  // Serial2.print(":01w12=1,\r\n");
+  // Serial.println("written???");
+  dpm8624 = Dpm8624(&currentState);
+  dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
   lcdstatus = LcdStatus(&currentState);
   lcdstatus.setupLCD();
   ds18b20status = DS18B20Stat(&currentState);
@@ -429,7 +428,7 @@ void setup()
   esp_task_wdt_reset();
   sendMessage(String("Laderegler hat nun IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
-
+  Serial.println("Setup  done. Start running...");
 }
 
 // the loop function runs over and over again forever
@@ -448,9 +447,10 @@ void loop()
   {
     ds18b20status.updateTemperature();
     ads1115.updateVoltage();
-  
+    Serial.print(timeClient.getFormattedTime());
+    Serial.println(" UTC");
   }
-  
+
   if (tickerC > 0)
     tickerC--;
   if (tickerC == 0 && currentState.flatPower > 1500)
@@ -469,7 +469,5 @@ void loop()
   // toggleRelayPowerIn();
   esp_task_wdt_reset();
 
-  Serial.print(timeClient.getFormattedTime());
-  Serial.println(" UTC");
   delay(1000);
 }
