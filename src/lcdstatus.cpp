@@ -64,7 +64,8 @@ void LcdStatus::updateHeaderStatus()
     u8g2.setDrawColor(drawColorBat);
     u8g2.drawGlyph(128 - 7, 19, 0x0036); // Bat charge
   }
-
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+  u8g2.drawStr(6, 59, __DATE__);
   u8g2.sendBuffer();
   // Serial.println("uHS ...");
 }

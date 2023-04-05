@@ -19,9 +19,10 @@ AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 Ticker temperatureTimer;
+Ticker voltageTimer;
+
 
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
 LcdStatus lcdstatus = NULL;
 DS18B20Stat ds18b20status = NULL;
 Ads1115 ads1115 = NULL;
@@ -394,7 +395,7 @@ void setup()
   connectToWiFi();
 
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
-  timeClient.begin();
+  
 
   // Serial.println(WiFi.localIP());
 
@@ -412,9 +413,12 @@ void setup()
   ds18b20status.setupSensors();
   ads1115 = Ads1115(&currentState);
   ads1115.setupADS();
-  // temperatureTimer.attach(45.0,ds18b20status.updateTemperature);
   analogReadResolution(12);
   analogSetWidth(12);
+
+  configTime(0, 0, NTP_POOL);
+  setenv("TZ", MY_TZ, 1);            // Set environment variable with your time zone
+  tzset();
 
   esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);               // add current thread to WDT watch
@@ -429,20 +433,34 @@ void setup()
   sendMessage(String("Laderegler hat nun IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
   Serial.println("Setup  done. Start running...");
+  temperatureTimer.attach(INTERVAL_ASK_TEMPERATURE, [](){ds18b20status.updateTemperature();});
+  voltageTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, [](){ads1115.updateVoltage();});
 }
 
 // the loop function runs over and over again forever
 int tickerC = 0;
-int minutes = 0;
-int seconds = 0;
+
 float voltBat = 0.0;
+
+void printLocalTime() {
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.print(&timeinfo, "%A, %d.%m.%Y %H:%M:%S ");
+   if (timeinfo.tm_isdst == 1)               // Daylight Saving Time flag
+    Serial.println("\tDST");  
+  else
+    Serial.println("\tSTD");
+}
 
 void loop()
 {
-  timeClient.update();
+ 
   esp_task_wdt_reset();
-  minutes = timeClient.getMinutes();
-  seconds = timeClient.getSeconds();
+ printLocalTime();
+  /*
   if (minutes % 2 == 0 && seconds < 2)
   {
     ds18b20status.updateTemperature();
@@ -450,6 +468,8 @@ void loop()
     Serial.print(timeClient.getFormattedTime());
     Serial.println(" UTC");
   }
+  */
+//Serial.println(timeClient.getFormattedTime());
 
   if (tickerC > 0)
     tickerC--;
