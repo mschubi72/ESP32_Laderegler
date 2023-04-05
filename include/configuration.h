@@ -70,6 +70,10 @@ const uint16_t OTA_PORT = 3232;
 #define INTERVAL_REFRESH_DISPLAY   2
 #define INTERVAL_PROCESS_ACTION    10
 
+#define NTP_POOL    "de.pool.ntp.org"
+// https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+// Europe/Berlin
+#define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 
 static unsigned char image_bits1[] = {
  0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,
