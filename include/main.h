@@ -11,10 +11,10 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
-#include <NTPClient.h>
 #include <U8g2lib.h>
 #include <HTTPClient.h>
 #include <UrlEncode.h>
+#include <time.h>
 
 #include "configuration.h"
 #include "version.h"
@@ -61,6 +61,7 @@ typedef struct {
     float tempBat2 = 0.0; //Bat case 2 temperature
     float tempInverter = 0.0; //Inverter temperature
     bool processed = false; //set false if value of flat power consumtion is set. So async processes is informed if there someting to do... 
+   char*  formattedTime = "";
 } State;
 
 // Helpers
