@@ -21,20 +21,37 @@ void LcdStatus::setupLCD()
   u8g2.drawStr(6, 59, __DATE__);
   u8g2.sendBuffer();
   Serial.println("LcdStatus initialized...");
-    Serial.printf("\tSCL Pin: %i, SDA Pin: %i \n", PIN_OLED_SCL, PIN_OLED_SDA);
+  Serial.printf("\tSCL Pin: %i, SDA Pin: %i \n", PIN_OLED_SCL, PIN_OLED_SDA);
 }
 
 void LcdStatus::updateFullScreen()
 {
+  updateHeaderStatus();
+
+u8g2.setClipWindow(0, 16, 128, 59);
+  u8g2.setDrawColor(0);
+  u8g2.drawBox(0, 16, 128, 59);
+  u8g2.setDrawColor(1);
+  
+  u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawStr(0, 59, status->formattedTime);
+  
+  u8g2.setDrawColor(1);
+  u8g2.drawLine(10,32,110,20);
+  u8g2.drawLine(10,32,110,44);
+
+  u8g2.sendBuffer();
+  // Serial.println("uHS ...");
 }
 
 // x(0,127);y(0,15)
 void LcdStatus::updateHeaderStatus()
 {
-  u8g2.setClipWindow(0, 0, 128, 16);
-  u8g2.setDrawColor(0);
-  u8g2.drawBox(0, 0, 128, 16);
-  u8g2.setDrawColor(1);
+  
+    u8g2.setClipWindow(0, 0, 128, 16);
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, 0, 128, 16);
+    u8g2.setDrawColor(1);
   u8g2.setFont(u8g2_font_unifont_t_weather);
   u8g2.drawGlyph(0, 15, 0x002e); // Sonne  34
   u8g2.setFont(stdFont);
@@ -50,7 +67,6 @@ void LcdStatus::updateHeaderStatus()
   w = w + 1 + u8g2.getStrWidth(String(status->flatPower).c_str());
   u8g2.setFont(u8g2_font_battery19_tn);
   status->batStatus = (status->batStatus + 1) % 6;
-  status->batVoltage = 1.0 + status->batStatus;
   u8g2.drawGlyph(w, 19, 0x0030 + status->batStatus); // Bat
 
   w = w + 8;
@@ -64,8 +80,6 @@ void LcdStatus::updateHeaderStatus()
     u8g2.setDrawColor(drawColorBat);
     u8g2.drawGlyph(128 - 7, 19, 0x0036); // Bat charge
   }
-  u8g2.setFont(u8g2_font_ncenB10_tr);
-  u8g2.drawStr(6, 59, __DATE__);
   u8g2.sendBuffer();
   // Serial.println("uHS ...");
 }

@@ -8,6 +8,7 @@ class Ads1115
 private:
     State *status;
     float batVoltage = 0.0;
+    float batVoltageSum = 0.0;
 
 public:
     Ads1115(State *state);

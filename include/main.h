@@ -61,13 +61,15 @@ typedef struct {
     float tempBat2 = 0.0; //Bat case 2 temperature
     float tempInverter = 0.0; //Inverter temperature
     bool processed = false; //set false if value of flat power consumtion is set. So async processes is informed if there someting to do... 
-   char*  formattedTime = "";
+   char*  formattedTime;
 } State;
 
 // Helpers
 void announceToHomeAssistant();
 void processStateJson(char* topic, char* payload);
-void updateState();
+void debugState(State *state);
+
+void doAction(); //do the Job of controlling
 
 void connectToWiFi();
 void onWiFiEvent(WiFiEvent_t event);

@@ -40,9 +40,11 @@ const uint16_t OTA_PORT = 3232;
 //solarpower/sensor/solarpower_leistung/state
 
 //#define MQTT_TOPIC_COMMAND reporting status
-#define MQTT_TOPIC_AVAILABLE "esp32lader/status"
+#define MQTT_TOPIC_AVAILABLE "esp32lader/available"
+#define MQTT_TOPIC_STATUS "esp32lader/state"
 
-#define DEFAULT_BAT_VOLTAGE 29400   //mV
+
+#define DEFAULT_BAT_VOLTAGE 29200   //mV
 #define DEFAULT_BAT_CURRENT 100     //mA
 
 
@@ -70,10 +72,14 @@ const uint16_t OTA_PORT = 3232;
 #define INTERVAL_REFRESH_DISPLAY   2
 #define INTERVAL_PROCESS_ACTION    10
 
+
+enum batVolages {BAT_EMPTY , BAT_LOW, BAT_NEAR_LOW, BAT_MIDDLE, BAT_NEAR_FULL, BAT_FULL};
+
 #define NTP_POOL    "de.pool.ntp.org"
 // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 // Europe/Berlin
 #define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
+
 
 static unsigned char image_bits1[] = {
  0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,

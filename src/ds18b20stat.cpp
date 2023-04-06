@@ -25,6 +25,7 @@ void DS18B20Stat::updateTemperature()
     status->tempBat1 = oneWireSensors.getTempCByIndex(BatteryLeftIdx);
     status->tempBat2 = oneWireSensors.getTempCByIndex(BatteryRightIdx);
     status->tempInverter = oneWireSensors.getTempCByIndex(InverterIdx);
+    /*
     Serial.println(" ");
     Serial.print("S0 -Bat1: ");
     Serial.print(status->tempBat1);
@@ -35,6 +36,7 @@ void DS18B20Stat::updateTemperature()
     Serial.print("S2 -Inv : ");
     Serial.print(status->tempInverter);
     Serial.println(" ºC");
+    */
 }
 
 void DS18B20Stat::printHWaddresses()

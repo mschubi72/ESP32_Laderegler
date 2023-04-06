@@ -9,6 +9,7 @@ private:
     State *status;   
     uint8_t drawColorBat=0; 
     const uint8_t* stdFont = u8g2_font_squirrel_tr;
+    bool toggle = true;
     //u8g2_font_ncenB12_tr
     //u8g2_font_astragal_nbp_t
     

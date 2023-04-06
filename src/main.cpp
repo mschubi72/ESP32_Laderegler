@@ -20,7 +20,8 @@ Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 Ticker temperatureTimer;
 Ticker voltageTimer;
-
+Ticker lcdTimer;
+Ticker debugTimer;
 
 WiFiUDP ntpUDP;
 LcdStatus lcdstatus = NULL;
@@ -139,7 +140,6 @@ void onMQTTConnect(bool sessionPresent)
   mqttClient.subscribe(MQTT_TOPIC_SOLAR, 0);
   mqttClient.publish(MQTT_TOPIC_AVAILABLE, 0, true, CMD_ALIVE);
   announceToHomeAssistant();
-  updateState();
 }
 
 void connectToMQTT()
@@ -244,83 +244,26 @@ void processStateJson(char *topic, char *payload)
 void announceToHomeAssistant()
 {
   Serial.println("MQTT: Annoucing to Home Assistant");
-  /*
-      StaticJsonBuffer<2048> jsonObject;
-      JsonObject& discovery = jsonObject.createObject();
-      discovery.set("name", NAME);
-      discovery.set("unique_id", WiFi.macAddress());
-      discovery.set("platform", "mqtt_json");
-      discovery.set("state_topic", MQTT_TOPIC_STATE);
-      discovery.set("availability_topic", MQTT_TOPIC_AVAILABLE);
-      discovery.set("command_topic", MQTT_TOPIC_COMMAND);
-      discovery.set("brightness", true);
-      discovery.set("rgb", true);
-      discovery.set("effect", true);
 
-      /// Adds effect list
-      JsonArray& effectList = discovery.createNestedArray("effect_list");
-      for(std::map<string,int>::iterator e = effects.begin(); e != effects.end(); ++e) {
-           effectList.add(e->first.c_str());
-      }
+  //    StaticJsonBuffer<2048> jsonObject;
+  StaticJsonDocument<256> mqttstate;
+  //   JsonObject& mqttstate = jsonObject.createObject();
+  mqttstate["formattedTime"] = currentState.formattedTime;
+  mqttstate["batStatus"] = currentState.batStatus;
+  mqttstate["batVoltage"] = currentState.batVoltage;
+  mqttstate["chargePowerRaw"] = currentState.chargePowerRaw;
+  mqttstate["chargePower"] = currentState.chargePower;
+  mqttstate["feedPowerBat"] = currentState.feedPowerBat;
+  mqttstate["chargePowerRaw"] = currentState.chargePowerRaw;
+  mqttstate["tempBat1"] = currentState.tempBat1;
+  mqttstate["tempBat2"] = currentState.tempBat2;
+  mqttstate["tempInverter"] = currentState.tempInverter;
 
-      char payload[2048];
-      discovery.printTo(payload);
-      Serial.println(payload);
-      mqttClient.publish(
-          "homeassistant/light/ledstrip/config",
-          2,
-          true,
-          payload
-      );
-      */
-}
-
-void updateState()
-{
-  Serial.println("STATE: Updating...");
-  /*
-      (currentState.on) ? ledstrip.start() : ledstrip.stop();
-      ledstrip.setBrightness(currentState.brightness);
-      ledstrip.setMode(effects[currentState.effect.c_str()]);
-      ledstrip.setSpeed(currentState.speed);
-      ledstrip.setColor(
-          currentState.color.r,
-          currentState.color.g,
-          currentState.color.b
-      );
-
-      StaticJsonBuffer<512> currentJsonStateBuffer;
-      JsonObject& currentJsonState = currentJsonStateBuffer.createObject();
-
-      currentJsonState.set("speed", currentState.speed);
-      currentJsonState.set("brightness", currentState.brightness);
-      currentJsonState.set("state", currentState.on ? "ON" : "OFF");
-      currentJsonState.set("effect", currentState.effect.c_str());
-
-      JsonObject& currentJsonStateColor = currentJsonState.createNestedObject("color");
-      currentJsonStateColor.set("r", currentState.color.r);
-      currentJsonStateColor.set("g", currentState.color.g);
-      currentJsonStateColor.set("b", currentState.color.b);
-
-      char payload[512];
-      currentJsonState.printTo(payload);
-
-      // Store current state in EEPROM.
-      Serial.println("EEPROM: Writing current state...");
-      EEPROM.writeString(0, payload);
-      EEPROM.commit();
-
-      if (mqttClient.connected()) {
-          Serial.println("STATE: Updating state on MQTT state topic");
-          Serial.println(payload);
-          mqttClient.publish(
-              "ledstrip/state",
-              2,
-              true,
-              payload
-          );
-      }
-      */
+  char payload[256];
+  serializeJson(mqttstate, payload);
+  Serial.println(payload);
+  //Serial.println(sizeof payload);
+  mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
 }
 
 void setup()
@@ -395,7 +338,6 @@ void setup()
   connectToWiFi();
 
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
-  
 
   // Serial.println(WiFi.localIP());
 
@@ -417,7 +359,7 @@ void setup()
   analogSetWidth(12);
 
   configTime(0, 0, NTP_POOL);
-  setenv("TZ", MY_TZ, 1);            // Set environment variable with your time zone
+  setenv("TZ", MY_TZ, 1); // Set environment variable with your time zone
   tzset();
 
   esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
@@ -433,8 +375,14 @@ void setup()
   sendMessage(String("Laderegler hat nun IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
   Serial.println("Setup  done. Start running...");
-  temperatureTimer.attach(INTERVAL_ASK_TEMPERATURE, [](){ds18b20status.updateTemperature();});
-  voltageTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, [](){ads1115.updateVoltage();});
+  temperatureTimer.attach(INTERVAL_ASK_TEMPERATURE, []()
+                          { ds18b20status.updateTemperature(); });
+  voltageTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, []()
+                      { ads1115.updateVoltage(); });
+  lcdTimer.attach(INTERVAL_REFRESH_DISPLAY, []()
+                  { lcdstatus.updateFullScreen(); });
+  debugTimer.attach(5, []()
+                    { debugState(&currentState); });
 }
 
 // the loop function runs over and over again forever
@@ -442,34 +390,58 @@ int tickerC = 0;
 
 float voltBat = 0.0;
 
-void printLocalTime() {
+void printLocalTime(State *state)
+{
   struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
+  char buffer[35];
+  if (!getLocalTime(&timeinfo))
+  {
     Serial.println("Failed to obtain time");
     return;
   }
-  Serial.print(&timeinfo, "%A, %d.%m.%Y %H:%M:%S ");
+  strftime(buffer, 35, "%d.%m.%Y %H:%M:%S", &timeinfo);
+  // Serial.println(buffer);
+
+  state->formattedTime = strdup(buffer);
+  // Serial.print("-->");
+  // Serial.println(state->formattedTime);
+
+  /*Serial.print(&timeinfo, "%A, %d.%m.%Y %H:%M:%S ");
    if (timeinfo.tm_isdst == 1)               // Daylight Saving Time flag
-    Serial.println("\tDST");  
+    Serial.println(" DST");
   else
-    Serial.println("\tSTD");
+    Serial.println(" STD");
+    */
+}
+
+void debugState(State *state)
+{
+  Serial.printf("\n-------- State %s ----------\n", state->formattedTime);
+  Serial.printf("\tBat Status: %i, Voltage: %fV, Ladeleistung: %iW(Raw)/%iW(DPM)\n", state->batStatus, state->batVoltage, state->chargePowerRaw, state->chargePower);
+  Serial.printf("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
+  Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter);
+  Serial.printf("\tProcessed: %s\n", state->processed ? "true" : "false");
+}
+
+void doAction()
+{
+  if (currentState.processed)
+  { // value was processed
+ //   Serial.println("Nothing to process...");
+  }
+  else
+  { // has to be process
+    Serial.println("Must be processed...");
+    currentState.processed = true;
+    announceToHomeAssistant();
+  }
 }
 
 void loop()
 {
- 
+
   esp_task_wdt_reset();
- printLocalTime();
-  /*
-  if (minutes % 2 == 0 && seconds < 2)
-  {
-    ds18b20status.updateTemperature();
-    ads1115.updateVoltage();
-    Serial.print(timeClient.getFormattedTime());
-    Serial.println(" UTC");
-  }
-  */
-//Serial.println(timeClient.getFormattedTime());
+  printLocalTime(&currentState);
 
   if (tickerC > 0)
     tickerC--;
@@ -485,9 +457,8 @@ void loop()
     sendMessage(String(msg.c_str()));
   }
   ArduinoOTA.handle();
-  lcdstatus.updateHeaderStatus();
   // toggleRelayPowerIn();
   esp_task_wdt_reset();
-
   delay(1000);
+  doAction();
 }

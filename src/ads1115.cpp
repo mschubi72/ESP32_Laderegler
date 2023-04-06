@@ -29,17 +29,22 @@ void Ads1115::updateVoltage()
 {
     float val_01 = ads.readADC(1);
     batVoltage = ads.toVoltage(val_01);
+    /*
     Serial.print("\n\t ADC1115-1: ");
     Serial.print(batVoltage);
     Serial.print(" V; corrected: ");
     Serial.println(batVoltage*14.0);
-
+*/
+    batVoltageSum = batVoltage;
     val_01 = ads.readADC(0);
     batVoltage = ads.toVoltage(val_01);
+  /*
     Serial.print("\t ADC1115-0: ");
     Serial.print(batVoltage);
     Serial.print(" V; corrected: ");
     Serial.println(batVoltage*14.0);
+    */
+    batVoltageSum += batVoltage;
 
-    status->batVoltage = batVoltage;
+    status->batVoltage = batVoltageSum*14.0/2.0;
 }
