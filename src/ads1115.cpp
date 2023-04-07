@@ -47,4 +47,23 @@ void Ads1115::updateVoltage()
     batVoltageSum += batVoltage;
 
     status->batVoltage = batVoltageSum*14.0/2.0;
+
+    if(status->batVoltage > BAT_FULL){
+        status->batStatus = 5;
+    }else if (status->batVoltage > BAT_70)
+    {
+        status->batStatus = 4;
+    }else if (status->batVoltage > BAT_40)
+    {
+        status->batStatus = 3;
+    }else if (status->batVoltage > BAT_30)
+    {
+        status->batStatus = 2;
+    }else if (status->batVoltage > BAT_20)
+    {
+        status->batStatus = 1;
+    }else
+    {
+        status->batStatus = 0;
+    }
 }
