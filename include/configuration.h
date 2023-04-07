@@ -36,6 +36,11 @@ const uint16_t OTA_PORT = 3232;
 // MQTT topics used by this program
 #define MQTT_TOPIC_SENSOR "tele/SGMDD/SENSOR"
 #define MQTT_TOPIC_SOLAR "solarpower/sensor/solarpower_leistung/state"
+#define MQTT_TOPIC_POWER_IN "lader-power/sensor/lader-power_power_in/state"
+#define MQTT_TOPIC_POWER_OUT "lader-power/sensor/lader-power_power_out/state"
+#define MQTT_TOPIC_RELAY_IN "lader-power/switch/lader-power_relay_out/state"
+#define MQTT_TOPIC_RELAY_OUT "lader-power/switch/lader-power_relay_in/state"
+
 ///sensor/solarpower_leistung"
 //solarpower/sensor/solarpower_leistung/state
 
@@ -46,7 +51,12 @@ const uint16_t OTA_PORT = 3232;
 
 #define DEFAULT_BAT_VOLTAGE 29200   //mV
 #define DEFAULT_BAT_CURRENT 100     //mA
-
+#define BAT_EMPTY 25.6
+#define BAT_20 25.8
+#define BAT_30 26.0
+#define BAT_40 26.2
+#define BAT_70 26.4
+#define BAT_FULL 27.0
 
 // Port for RS485 Communication to DPM8624
 #define RS485_RXD2 16
@@ -63,9 +73,6 @@ const uint16_t OTA_PORT = 3232;
 #define PIN_ADS_SCL 4
 #define PIN_ADS_SDA 2 
 
-#define u8g_logo_width 12
-#define u8g_logo_height 12
-
 //intervals for actions in seconds
 #define INTERVAL_ASK_TEMPERATURE   60
 #define INTERVAL_ASK_BAT_VOLTAGE   10
@@ -73,13 +80,13 @@ const uint16_t OTA_PORT = 3232;
 #define INTERVAL_PROCESS_ACTION    10
 
 
-enum batVolages {BAT_EMPTY , BAT_LOW, BAT_NEAR_LOW, BAT_MIDDLE, BAT_NEAR_FULL, BAT_FULL};
-
 #define NTP_POOL    "de.pool.ntp.org"
 // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 // Europe/Berlin
 #define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 
+#define u8g_logo_width 32
+#define u8g_logo_height 16
 
 static unsigned char image_bits1[] = {
  0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0xfe,

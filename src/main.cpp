@@ -138,6 +138,12 @@ void onMQTTConnect(bool sessionPresent)
   Serial.println("MQTT: Connected.");
   mqttClient.subscribe(MQTT_TOPIC_SENSOR, 0);
   mqttClient.subscribe(MQTT_TOPIC_SOLAR, 0);
+
+  mqttClient.subscribe(MQTT_TOPIC_POWER_IN, 0);
+  mqttClient.subscribe(MQTT_TOPIC_POWER_OUT, 0);
+  mqttClient.subscribe(MQTT_TOPIC_RELAY_IN, 0);
+  mqttClient.subscribe(MQTT_TOPIC_RELAY_OUT, 0);
+
   mqttClient.publish(MQTT_TOPIC_AVAILABLE, 0, true, CMD_ALIVE);
   announceToHomeAssistant();
 }
@@ -178,6 +184,7 @@ void processStateJson(char *topic, char *payload)
   DEBUG_PRINTLN(topic);
   DEBUG_PRINT("Payload: ");
   DEBUG_PRINTLN(payload);
+  int16_t watt=0;
 
   // JsonObject& root = jsonBuffer.parseObject(payload);
   if (strcmp(topic, MQTT_TOPIC_SENSOR) == 0) // Powermeter
@@ -210,9 +217,39 @@ void processStateJson(char *topic, char *payload)
   else if (strcmp(topic, MQTT_TOPIC_SOLAR) == 0) // Solarpower
   {
     // Serial.println("*** Solarpower ***");
-    int16_t watt = atoi(payload);
+    watt = atoi(payload);
     // Serial.println("Solarleistung: " + String(watt));
     currentState.solarPower = watt;
+  }
+  else if (strcmp(topic, MQTT_TOPIC_POWER_IN) == 0) // Ladeleistung
+  {
+    watt = atoi(payload);
+    //Serial.println("Ladeleistung: " + String(watt));
+    currentState.chargePowerRaw = watt;
+  }
+  else if (strcmp(topic, MQTT_TOPIC_POWER_OUT) == 0) // Einspeiseleistung Akku
+  {
+    watt = atoi(payload);
+    //Serial.println("Einspeiseleistung: " + String(watt));
+    currentState.feedPowerBat = watt;
+  }
+  else if (strcmp(topic, MQTT_TOPIC_RELAY_IN) == 0) // Relay Status Lader
+  {
+    if (strcmp(payload, "ON") == 0){
+      currentState.relay_in = true;
+    }else{
+      currentState.relay_in = false;
+    }
+   // Serial.println("Relay Lader: " + String(payload));
+  }
+  else if (strcmp(topic, MQTT_TOPIC_RELAY_OUT) == 0) // Relay Status Einspeisung
+  {
+    if (strcmp(payload, "ON") == 0){
+      currentState.relay_out = true;
+    }else{
+      currentState.relay_out = false;
+    }
+ //   Serial.println("Relay Einspeisung: " + String(payload));
   }
   else
   {
@@ -262,7 +299,7 @@ void announceToHomeAssistant()
   char payload[256];
   serializeJson(mqttstate, payload);
   Serial.println(payload);
-  //Serial.println(sizeof payload);
+  // Serial.println(sizeof payload);
   mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
 }
 
@@ -421,13 +458,14 @@ void debugState(State *state)
   Serial.printf("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
   Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter);
   Serial.printf("\tProcessed: %s\n", state->processed ? "true" : "false");
+  Serial.printf("\tRelay_In: %s, Relay_Out: %s\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
 }
 
 void doAction()
 {
   if (currentState.processed)
   { // value was processed
- //   Serial.println("Nothing to process...");
+    //   Serial.println("Nothing to process...");
   }
   else
   { // has to be process
