@@ -7,9 +7,11 @@ class LcdStatus
 {
 private:
     State *status;   
-    uint8_t drawColorBat=0; 
+    uint8_t drawColorToggle=0; 
     const uint8_t* stdFont = u8g2_font_squirrel_tr;
     bool toggle = true;
+    uint8_t ants=0; 
+    
     //u8g2_font_ncenB12_tr
     //u8g2_font_astragal_nbp_t
     
@@ -25,6 +27,10 @@ void updateFullScreen();
 
 //refresh only Header (Solarwatt, Powerwatt, Batt)
 void updateHeaderStatus();
+
+void drawArrows(uint8_t x, uint8_t y, bool reverse);
+void drawX(uint8_t x, uint8_t y);
+
 };
 
 #endif
