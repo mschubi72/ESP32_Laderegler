@@ -16,6 +16,8 @@ private:
     static const char* CMD_SET_CURRENT;
     static const char* CMD_SET_VOLTAGE_AND_CURRENT;
     static const char* CMD_ENABLE_OUTPUT;
+    static const char* CMD_DISABLE_OUTPUT;
+    
 
     static const char* CMD_GET_CURRENT_VOLTAGE;
     static const char* CMD_GET_VOLTAGE_PROG;
@@ -38,7 +40,7 @@ public:
     void setupDPM(u_int initialVoltage_mV, u_int initialCurrent_mA);
     void setCurrent(u_int newCurrent_mA);
     void setVoltage(u_int newVoltage_mV);
-    void setVoltageCurrent(u_int newCurrent_mA, u_int newVoltage_mV);
+    void setVoltageCurrent(u_int newVoltage_mV, u_int newCurrent_mA);
 
     //enabled Output, but also use new settings
     void enableOutput();

@@ -172,9 +172,11 @@ void onMQTTMessage(
     AsyncMqttClientMessageProperties properties,
     size_t len, size_t index, size_t total)
 {
-  // Serial.println("MQTT: message received");
-  // Serial.println(payload);
-  processStateJson(topic, payload);
+  //https://github.com/marvinroger/async-mqtt-client/issues/35
+  char new_payload[len+1];
+  new_payload[len] = '\0';
+  strncpy(new_payload, payload, len);
+  processStateJson(topic, new_payload);
 }
 
 void processStateJson(char *topic, char *payload)
@@ -224,7 +226,6 @@ void processStateJson(char *topic, char *payload)
   else if (strcmp(topic, MQTT_TOPIC_POWER_IN) == 0) // Ladeleistung
   {
     watt = atoi(payload);
-    //Serial.println("Ladeleistung: " + String(watt));
     currentState.chargePowerRaw = watt;
   }
   else if (strcmp(topic, MQTT_TOPIC_POWER_OUT) == 0) // Einspeiseleistung Akku
@@ -280,7 +281,7 @@ void processStateJson(char *topic, char *payload)
 
 void announceToHomeAssistant()
 {
-  Serial.println("MQTT: Annoucing to Home Assistant");
+ // Serial.println("MQTT: Annoucing to Home Assistant");
 
   //    StaticJsonBuffer<2048> jsonObject;
   StaticJsonDocument<256> mqttstate;
@@ -298,7 +299,7 @@ void announceToHomeAssistant()
 
   char payload[256];
   serializeJson(mqttstate, payload);
-  Serial.println(payload);
+  //Serial.println(payload);
   // Serial.println(sizeof payload);
   mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
 }
@@ -418,8 +419,8 @@ void setup()
                       { ads1115.updateVoltage(); });
   lcdTimer.attach(INTERVAL_REFRESH_DISPLAY, []()
                   { lcdstatus.updateFullScreen(); });
-  debugTimer.attach(5, []()
-                    { debugState(&currentState); });
+  //debugTimer.attach(5, []()
+  //                  { debugState(&currentState); });
 }
 
 // the loop function runs over and over again forever
@@ -475,10 +476,63 @@ void doAction()
   }
 }
 
+int incomingByte = 0; // for incoming serial data
+String erg;
+
 void loop()
 {
-
+  if (Serial.available()) { // if there is data comming
+    String command = Serial.readStringUntil('\n'); // read string until newline character
+    String s_cmd = command + "\r\n";
+    Serial.printf("CMD: %s", s_cmd);
+    Serial2.print(s_cmd);
+  }
+  unsigned long errorTimer = millis();
+  String response;
+  while ((millis() - errorTimer) < 250)
+    {
+        if (Serial2.available())
+        {
+            char inChar = (char)Serial2.read();
+            if (inChar == '\n')
+            {
+                // No need to implement response checking as no way to check whether the command was correct, only received in a correct format. But format is always correct.
+                //return true;
+            }
+            else
+            {
+                response += inChar;
+            }
+        }
+    }
+    //return false;
+    Serial.printf("Erg: >%s<", response);
+  dpm8624.getCurrentLimit();
+  //Serial.println(":01r00=0,\r\n");
+  //delay(10);
+  //Serial.print(":01w10=2000,\r\n");
+ // Serial2.print(":01w10=2000,\r\n");
+ // dpm8624.setVoltage(1888);
+ //dpm8624.getCurrentLimit();
+ // dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
+  
+  //if (Serial2.available() > 0) {
+    /*
+    erg = Serial2.readString();
+    Serial.printf("Erg[%d]:", erg.length());
+    Serial.println(erg);
+    */
+    /*
+    incomingByte = Serial2.read();
+ 
+    // say what you got:
+    Serial.print("received: ");
+    Serial.println(incomingByte);
+    */
+  //}
+  
   esp_task_wdt_reset();
+  
   printLocalTime(&currentState);
 
   if (tickerC > 0)
@@ -497,6 +551,13 @@ void loop()
   ArduinoOTA.handle();
   // toggleRelayPowerIn();
   esp_task_wdt_reset();
+  
   delay(1000);
+esp_task_wdt_reset();
+  delay(1000);
+esp_task_wdt_reset();
+  delay(1000);
+esp_task_wdt_reset();
+
   doAction();
 }
