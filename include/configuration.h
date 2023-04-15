@@ -49,9 +49,10 @@ const uint16_t OTA_PORT = 3232;
 #define MQTT_TOPIC_STATUS "esp32lader/state"
 
 
-#define DEFAULT_BAT_VOLTAGE 29200   //mV
-#define DEFAULT_BAT_CURRENT 100     //mA
-#define BAT_EMPTY 25.6
+#define DEFAULT_BAT_VOLTAGE 29.2   //V
+#define DEFAULT_BAT_CURRENT 1.0     //A
+//#define BAT_EMPTY 25.6
+#define BAT_EMPTY 24.2
 #define BAT_20 25.8
 #define BAT_30 26.0
 #define BAT_40 26.2

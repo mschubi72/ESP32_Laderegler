@@ -46,7 +46,9 @@ void Ads1115::updateVoltage()
     */
     batVoltageSum += batVoltage;
 
-    status->batVoltage = batVoltageSum*14.0/2.0;
+    int tempBat = 100 * (batVoltageSum*14.0/2.0);
+    status->batVoltage = tempBat/100.0;
+    //status->batVoltage = roundf(100.0f * status->batVoltage)/100.0f; 
 
     if(status->batVoltage > BAT_FULL){
         status->batStatus = 5;

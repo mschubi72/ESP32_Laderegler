@@ -2,7 +2,7 @@
 #include "lcdstatus.h"
 #include "ds18b20stat.h"
 #include "ads1115.h"
-#include "dpm8624.h"
+#include "DPM8600.h"
 
 #include <esp_task_wdt.h>
 
@@ -21,13 +21,17 @@ Ticker wifiReconnectTimer;
 Ticker temperatureTimer;
 Ticker voltageTimer;
 Ticker lcdTimer;
+Ticker dpmTimer;
 Ticker debugTimer;
 
 WiFiUDP ntpUDP;
 LcdStatus lcdstatus = NULL;
 DS18B20Stat ds18b20status = NULL;
 Ads1115 ads1115 = NULL;
-Dpm8624 dpm8624 = NULL;
+// Dpm8624 dpm8624 = NULL;
+DPM8600 dpm8624 = DPM8600(1, &currentState);;
+
+bool ipReady = false;
 
 void sendMessage(String message)
 {
@@ -36,6 +40,7 @@ void sendMessage(String message)
   String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
   Serial.println("Message URL:");
   Serial.println(url);
+esp_task_wdt_reset();
 
   HTTPClient http;
   http.begin(url);
@@ -108,10 +113,12 @@ void onWiFiEvent(WiFiEvent_t event)
     // Serial.println("WIFI: Got IP!");
     Serial.print("WIFI: IP Address: ");
     Serial.println(WiFi.localIP());
+    ipReady = true;
     connectToMQTT();
     break;
   case SYSTEM_EVENT_STA_DISCONNECTED:
     Serial.println("WIFI: Disconnected.");
+    ipReady = false;
     mqttReconnectTimer.detach();
     wifiReconnectTimer.once(2, connectToWiFi);
     break;
@@ -172,8 +179,8 @@ void onMQTTMessage(
     AsyncMqttClientMessageProperties properties,
     size_t len, size_t index, size_t total)
 {
-  //https://github.com/marvinroger/async-mqtt-client/issues/35
-  char new_payload[len+1];
+  // https://github.com/marvinroger/async-mqtt-client/issues/35
+  char new_payload[len + 1];
   new_payload[len] = '\0';
   strncpy(new_payload, payload, len);
   processStateJson(topic, new_payload);
@@ -186,7 +193,7 @@ void processStateJson(char *topic, char *payload)
   DEBUG_PRINTLN(topic);
   DEBUG_PRINT("Payload: ");
   DEBUG_PRINTLN(payload);
-  int16_t watt=0;
+  int16_t watt = 0;
 
   // JsonObject& root = jsonBuffer.parseObject(payload);
   if (strcmp(topic, MQTT_TOPIC_SENSOR) == 0) // Powermeter
@@ -231,26 +238,32 @@ void processStateJson(char *topic, char *payload)
   else if (strcmp(topic, MQTT_TOPIC_POWER_OUT) == 0) // Einspeiseleistung Akku
   {
     watt = atoi(payload);
-    //Serial.println("Einspeiseleistung: " + String(watt));
+    // Serial.println("Einspeiseleistung: " + String(watt));
     currentState.feedPowerBat = watt;
   }
   else if (strcmp(topic, MQTT_TOPIC_RELAY_IN) == 0) // Relay Status Lader
   {
-    if (strcmp(payload, "ON") == 0){
+    if (strcmp(payload, "ON") == 0)
+    {
       currentState.relay_in = true;
-    }else{
+    }
+    else
+    {
       currentState.relay_in = false;
     }
-   // Serial.println("Relay Lader: " + String(payload));
+    // Serial.println("Relay Lader: " + String(payload));
   }
   else if (strcmp(topic, MQTT_TOPIC_RELAY_OUT) == 0) // Relay Status Einspeisung
   {
-    if (strcmp(payload, "ON") == 0){
+    if (strcmp(payload, "ON") == 0)
+    {
       currentState.relay_out = true;
-    }else{
+    }
+    else
+    {
       currentState.relay_out = false;
     }
- //   Serial.println("Relay Einspeisung: " + String(payload));
+    //   Serial.println("Relay Einspeisung: " + String(payload));
   }
   else
   {
@@ -281,7 +294,7 @@ void processStateJson(char *topic, char *payload)
 
 void announceToHomeAssistant()
 {
- // Serial.println("MQTT: Annoucing to Home Assistant");
+  // Serial.println("MQTT: Annoucing to Home Assistant");
 
   //    StaticJsonBuffer<2048> jsonObject;
   StaticJsonDocument<256> mqttstate;
@@ -296,17 +309,19 @@ void announceToHomeAssistant()
   mqttstate["tempBat1"] = currentState.tempBat1;
   mqttstate["tempBat2"] = currentState.tempBat2;
   mqttstate["tempInverter"] = currentState.tempInverter;
+  mqttstate["tempDpm"] = currentState.tempDpm;
 
   char payload[256];
   serializeJson(mqttstate, payload);
-  //Serial.println(payload);
-  // Serial.println(sizeof payload);
+  // Serial.println(payload);
+  //  Serial.println(sizeof payload);
+  esp_task_wdt_reset();
   mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
 }
 
 void setup()
 {
-  pinMode(22, OUTPUT);
+  pinMode(22, OUTPUT); //LED
 
   Serial.begin(MONITOR_BAUDRATE);
   Serial.println("\n\n--------------------------------------------------------------------------");
@@ -374,23 +389,24 @@ void setup()
 
   // Get connected
   connectToWiFi();
+  Serial.print("Wait for IP ");
+  while(!ipReady){
+    Serial.print(".");
+    delay(100);
+  }
+  Serail.println(" done.");
 
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
 
-  // Serial.println(WiFi.localIP());
-
-  // Serial.println("Write Spannung");
-  //  Serial2.print(":01w10=1234,\r\n");
-  // Serial2.print(":01w20=1450,5000,\r\n");
-  // delay(50);
-  // Serial2.print(":01w12=1,\r\n");
-  // Serial.println("written???");
-  dpm8624 = Dpm8624(&currentState);
+  dpm8624.begin(Serial2);
   dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
+  
   lcdstatus = LcdStatus(&currentState);
   lcdstatus.setupLCD();
+  
   ds18b20status = DS18B20Stat(&currentState);
   ds18b20status.setupSensors();
+  
   ads1115 = Ads1115(&currentState);
   ads1115.setupADS();
   analogReadResolution(12);
@@ -402,25 +418,25 @@ void setup()
 
   esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);               // add current thread to WDT watch
-  // Send Message to WhatsAPP
-  sendMessage("Hello from ESP32!");
-  // Send Message to WhatsAPP
   esp_task_wdt_reset();
   delay(2000);
   esp_task_wdt_reset();
   delay(2000);
   esp_task_wdt_reset();
-  sendMessage(String("Laderegler hat nun IP: " + WiFi.localIP().toString()).c_str());
+  
+  sendMessage(String("Laderegler started. IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
-  Serial.println("Setup  done. Start running...");
+  Serial.println("Setup  done.\n==>Now in running state...\n");
   temperatureTimer.attach(INTERVAL_ASK_TEMPERATURE, []()
                           { ds18b20status.updateTemperature(); });
   voltageTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, []()
                       { ads1115.updateVoltage(); });
   lcdTimer.attach(INTERVAL_REFRESH_DISPLAY, []()
                   { lcdstatus.updateFullScreen(); });
-  //debugTimer.attach(5, []()
-  //                  { debugState(&currentState); });
+  dpmTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, []()
+                  { dpm8624.updateStatus(); });
+  debugTimer.attach(5, []()
+                    { debugState(&currentState); });
 }
 
 // the loop function runs over and over again forever
@@ -457,7 +473,7 @@ void debugState(State *state)
   Serial.printf("\n-------- State %s ----------\n", state->formattedTime);
   Serial.printf("\tBat Status: %i, Voltage: %fV, Ladeleistung: %iW(Raw)/%iW(DPM)\n", state->batStatus, state->batVoltage, state->chargePowerRaw, state->chargePower);
   Serial.printf("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
-  Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter);
+  Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C, DPM: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter, state->tempDpm);
   Serial.printf("\tProcessed: %s\n", state->processed ? "true" : "false");
   Serial.printf("\tRelay_In: %s, Relay_Out: %s\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
 }
@@ -481,58 +497,13 @@ String erg;
 
 void loop()
 {
-  if (Serial.available()) { // if there is data comming
-    String command = Serial.readStringUntil('\n'); // read string until newline character
-    String s_cmd = command + "\r\n";
-    Serial.printf("CMD: %s", s_cmd);
-    Serial2.print(s_cmd);
-  }
-  unsigned long errorTimer = millis();
-  String response;
-  while ((millis() - errorTimer) < 250)
-    {
-        if (Serial2.available())
-        {
-            char inChar = (char)Serial2.read();
-            if (inChar == '\n')
-            {
-                // No need to implement response checking as no way to check whether the command was correct, only received in a correct format. But format is always correct.
-                //return true;
-            }
-            else
-            {
-                response += inChar;
-            }
-        }
-    }
-    //return false;
-    Serial.printf("Erg: >%s<", response);
-  dpm8624.getCurrentLimit();
-  //Serial.println(":01r00=0,\r\n");
-  //delay(10);
-  //Serial.print(":01w10=2000,\r\n");
- // Serial2.print(":01w10=2000,\r\n");
- // dpm8624.setVoltage(1888);
- //dpm8624.getCurrentLimit();
- // dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
-  
-  //if (Serial2.available() > 0) {
-    /*
-    erg = Serial2.readString();
-    Serial.printf("Erg[%d]:", erg.length());
-    Serial.println(erg);
-    */
-    /*
-    incomingByte = Serial2.read();
- 
-    // say what you got:
-    Serial.print("received: ");
-    Serial.println(incomingByte);
-    */
-  //}
-  
   esp_task_wdt_reset();
   
+  Serial.printf("DPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
+                dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
+
+  esp_task_wdt_reset();
+
   printLocalTime(&currentState);
 
   if (tickerC > 0)
@@ -551,13 +522,13 @@ void loop()
   ArduinoOTA.handle();
   // toggleRelayPowerIn();
   esp_task_wdt_reset();
-  
+
   delay(1000);
-esp_task_wdt_reset();
+  esp_task_wdt_reset();
   delay(1000);
-esp_task_wdt_reset();
+  esp_task_wdt_reset();
   delay(1000);
-esp_task_wdt_reset();
+  esp_task_wdt_reset();
 
   doAction();
 }

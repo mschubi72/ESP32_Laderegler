@@ -58,6 +58,7 @@ typedef struct
     float tempBat1 = 0.0;        // Bat case 1 temperature
     float tempBat2 = 0.0;        // Bat case 2 temperature
     float tempInverter = 0.0;    // Inverter temperature
+    float tempDpm = 0.0;         // DPM temperature
     bool processed = false;      // set false if value of flat power consumtion is set. So async processes is informed if there someting to do...
     bool relay_in = false;       
     bool relay_out = false;

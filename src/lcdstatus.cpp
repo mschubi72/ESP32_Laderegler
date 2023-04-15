@@ -77,7 +77,7 @@ void LcdStatus::updateFullScreen()
 
   u8g2.setFont(u8g2_font_unifont_t_77);
   u8g2.drawGlyph(50, 40, 0x269b); // Atom
-  if (status->chargePowerRaw > 1)
+  if (status->chargePower > 1)
   {
     drawArrows(66, 38, false);
     u8g2.setFont(u8g2_font_battery19_tn);
