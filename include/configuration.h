@@ -38,8 +38,8 @@ const uint16_t OTA_PORT = 3232;
 #define MQTT_TOPIC_SOLAR "solarpower/sensor/solarpower_leistung/state"
 #define MQTT_TOPIC_POWER_IN "lader-power/sensor/lader-power_power_in/state"
 #define MQTT_TOPIC_POWER_OUT "lader-power/sensor/lader-power_power_out/state"
-#define MQTT_TOPIC_RELAY_IN "lader-power/switch/lader-power_relay_out/state"
-#define MQTT_TOPIC_RELAY_OUT "lader-power/switch/lader-power_relay_in/state"
+#define MQTT_TOPIC_RELAY_IN "lader-power/switch/lader-power_relay_in/state"
+#define MQTT_TOPIC_RELAY_OUT "lader-power/switch/lader-power_relay_out/state"
 
 ///sensor/solarpower_leistung"
 //solarpower/sensor/solarpower_leistung/state
@@ -85,6 +85,8 @@ const uint16_t OTA_PORT = 3232;
 // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 // Europe/Berlin
 #define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
+#define MORNING 0530
+#define EVENING 2100
 
 #define u8g_logo_width 32
 #define u8g_logo_height 16

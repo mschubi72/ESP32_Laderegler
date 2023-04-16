@@ -29,9 +29,11 @@ LcdStatus lcdstatus = NULL;
 DS18B20Stat ds18b20status = NULL;
 Ads1115 ads1115 = NULL;
 // Dpm8624 dpm8624 = NULL;
-DPM8600 dpm8624 = DPM8600(1, &currentState);;
+DPM8600 dpm8624 = DPM8600(1, &currentState);
+;
 
 bool ipReady = false;
+u_int currentTime = 0;
 
 void sendMessage(String message)
 {
@@ -40,7 +42,7 @@ void sendMessage(String message)
   String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
   Serial.println("Message URL:");
   Serial.println(url);
-esp_task_wdt_reset();
+  esp_task_wdt_reset();
 
   HTTPClient http;
   http.begin(url);
@@ -63,6 +65,60 @@ esp_task_wdt_reset();
 
   // Free resources
   http.end();
+}
+
+void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
+  //http://192.168.1.87/switch/lader-power_relay_out/turn_on
+  String urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_on";
+  String urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_on";
+  if(! switchRelayInOn){
+    urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_off";
+  }
+  if(! switchRelayOutOn){
+    urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_off";
+  }
+
+  //Serial.printf("Switch RelayIn: %s... ", urlIn);
+  HTTPClient http;
+  http.begin(urlIn);
+  // Specify content-type header
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  // Send HTTP POST request
+  int httpResponseCode = http.POST(urlIn);
+  if (httpResponseCode == 200)
+  {
+    Serial.println(" Message sent successfully");
+  }
+  else
+  {
+    Serial.println(" Error sending the message");
+    Serial.println("HTTP response code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+
+  //Serial.printf("Switch RelayOut: %s... ", urlOut);
+  //HTTPClient http;
+  http.begin(urlOut);
+  // Specify content-type header
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  // Send HTTP POST request
+  httpResponseCode = http.POST(urlIn);
+  if (httpResponseCode == 200)
+  {
+    Serial.println(" Message sent successfully");
+  }
+  else
+  {
+    Serial.println(" Error sending the message");
+    Serial.println("HTTP response code: ");
+    Serial.println(httpResponseCode);
+  }
+
+  // Free resources
+  http.end();
+
 }
 
 void toggleRelayPowerIn()
@@ -251,7 +307,7 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_in = false;
     }
-    // Serial.println("Relay Lader: " + String(payload));
+     Serial.println("Relay Lader: " + String(payload));
   }
   else if (strcmp(topic, MQTT_TOPIC_RELAY_OUT) == 0) // Relay Status Einspeisung
   {
@@ -263,7 +319,7 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_out = false;
     }
-    //   Serial.println("Relay Einspeisung: " + String(payload));
+       Serial.println("Relay Einspeisung: " + String(payload));
   }
   else
   {
@@ -321,7 +377,7 @@ void announceToHomeAssistant()
 
 void setup()
 {
-  pinMode(22, OUTPUT); //LED
+  pinMode(22, OUTPUT); // LED
 
   Serial.begin(MONITOR_BAUDRATE);
   Serial.println("\n\n--------------------------------------------------------------------------");
@@ -390,23 +446,24 @@ void setup()
   // Get connected
   connectToWiFi();
   Serial.print("Wait for IP ");
-  while(!ipReady){
+  while (!ipReady)
+  {
     Serial.print(".");
     delay(100);
   }
-  Serail.println(" done.");
+  Serial.println(" done.");
 
   // setupOTA(WIFI_HOSTNAME, OTA_PORT);
 
   dpm8624.begin(Serial2);
   dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
-  
+
   lcdstatus = LcdStatus(&currentState);
   lcdstatus.setupLCD();
-  
+
   ds18b20status = DS18B20Stat(&currentState);
   ds18b20status.setupSensors();
-  
+
   ads1115 = Ads1115(&currentState);
   ads1115.setupADS();
   analogReadResolution(12);
@@ -423,7 +480,7 @@ void setup()
   esp_task_wdt_reset();
   delay(2000);
   esp_task_wdt_reset();
-  
+
   sendMessage(String("Laderegler started. IP: " + WiFi.localIP().toString()).c_str());
   ds18b20status.printHWaddresses();
   Serial.println("Setup  done.\n==>Now in running state...\n");
@@ -457,6 +514,7 @@ void printLocalTime(State *state)
   // Serial.println(buffer);
 
   state->formattedTime = strdup(buffer);
+  currentTime = timeinfo.tm_hour * 100 + timeinfo.tm_min;
   // Serial.print("-->");
   // Serial.println(state->formattedTime);
 
@@ -475,7 +533,12 @@ void debugState(State *state)
   Serial.printf("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
   Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C, DPM: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter, state->tempDpm);
   Serial.printf("\tProcessed: %s\n", state->processed ? "true" : "false");
-  Serial.printf("\tRelay_In: %s, Relay_Out: %s\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
+  Serial.printf("\tRelay_In: %s, Relay_Out: %s\n\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
+  esp_task_wdt_reset();
+  Serial.printf("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
+                dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
+  Serial.printf("\tTimecode: %d\n", currentTime);
+  esp_task_wdt_reset();
 }
 
 void doAction()
@@ -489,6 +552,16 @@ void doAction()
     Serial.println("Must be processed...");
     currentState.processed = true;
     announceToHomeAssistant();
+    if(currentTime > EVENING || currentTime < MORNING){ //Nachteinspeisung
+      dpm8624.power(false);
+      if(currentState.batStatus > 3){
+        switchRelay(true, true);
+      }else{
+        switchRelay(true, false);  
+      }
+    }else{ //Tagsteuerung
+
+    }
   }
 }
 
@@ -498,12 +571,6 @@ String erg;
 void loop()
 {
   esp_task_wdt_reset();
-  
-  Serial.printf("DPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
-                dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
-
-  esp_task_wdt_reset();
-
   printLocalTime(&currentState);
 
   if (tickerC > 0)

@@ -66,7 +66,7 @@ void LcdStatus::updateFullScreen()
   u8g2.setFont(u8g2_font_unifont_t_weather);
   u8g2.drawGlyph(0, 40, 0x002e); // Sonne  34
                                  // drawArrows(18,38,false);
-  if (status->solarPower > 1)
+  if (status->solarPower > 1) // Solarpower 
   {
     drawArrows(18, 38, false);
   }
@@ -77,14 +77,14 @@ void LcdStatus::updateFullScreen()
 
   u8g2.setFont(u8g2_font_unifont_t_77);
   u8g2.drawGlyph(50, 40, 0x269b); // Atom
-  if (status->chargePower > 1)
+  if (status->chargePower > 1) // charge battery
   {
     drawArrows(66, 38, false);
     u8g2.setFont(u8g2_font_battery19_tn);
     u8g2.setDrawColor(1);
     u8g2.drawGlyph(96, 40, 0x0036); // Bat charge
   }
-  else if (status->feedPowerBat > 1)
+  else if (status->feedPowerBat < 0) // feed from battery
   {
     drawArrows(66, 38, true);
     u8g2.setFont(u8g2_font_battery19_tn);
