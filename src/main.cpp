@@ -67,18 +67,21 @@ void sendMessage(String message)
   http.end();
 }
 
-void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
-  //http://192.168.1.87/switch/lader-power_relay_out/turn_on
+void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
+{
+  // http://192.168.1.87/switch/lader-power_relay_out/turn_on
   String urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_on";
   String urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_on";
-  if(! switchRelayInOn){
+  if (!switchRelayInOn)
+  {
     urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_off";
   }
-  if(! switchRelayOutOn){
+  if (!switchRelayOutOn)
+  {
     urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_off";
   }
 
-  //Serial.printf("Switch RelayIn: %s... ", urlIn);
+  // Serial.printf("Switch RelayIn: %s... ", urlIn);
   HTTPClient http;
   http.begin(urlIn);
   // Specify content-type header
@@ -87,7 +90,8 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
   int httpResponseCode = http.POST(urlIn);
   if (httpResponseCode == 200)
   {
-    Serial.println(" Message sent successfully");
+    // Serial.println(" Message sent successfully");
+    state->relay_in = switchRelayInOn;
   }
   else
   {
@@ -98,8 +102,8 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
   // Free resources
   http.end();
 
-  //Serial.printf("Switch RelayOut: %s... ", urlOut);
-  //HTTPClient http;
+  // Serial.printf("Switch RelayOut: %s... ", urlOut);
+  // HTTPClient http;
   http.begin(urlOut);
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -107,7 +111,8 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
   httpResponseCode = http.POST(urlIn);
   if (httpResponseCode == 200)
   {
-    Serial.println(" Message sent successfully");
+    // Serial.println(" Message sent successfully");
+    state->relay_out = switchRelayOutOn;
   }
   else
   {
@@ -118,7 +123,6 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn){
 
   // Free resources
   http.end();
-
 }
 
 void toggleRelayPowerIn()
@@ -307,7 +311,7 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_in = false;
     }
-     Serial.println("Relay Lader: " + String(payload));
+    Serial.println("Relay Lader: " + String(payload));
   }
   else if (strcmp(topic, MQTT_TOPIC_RELAY_OUT) == 0) // Relay Status Einspeisung
   {
@@ -319,7 +323,7 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_out = false;
     }
-       Serial.println("Relay Einspeisung: " + String(payload));
+    Serial.println("Relay Einspeisung: " + String(payload));
   }
   else
   {
@@ -492,8 +496,8 @@ void setup()
                   { lcdstatus.updateFullScreen(); });
   dpmTimer.attach(INTERVAL_ASK_BAT_VOLTAGE, []()
                   { dpm8624.updateStatus(); });
-  debugTimer.attach(5, []()
-                    { debugState(&currentState); });
+  //  debugTimer.attach(5, []()
+  //                    { debugState(&currentState); });
 }
 
 // the loop function runs over and over again forever
@@ -550,18 +554,103 @@ void doAction()
   else
   { // has to be process
     Serial.println("Must be processed...");
+    debugState(&currentState);
     currentState.processed = true;
-    announceToHomeAssistant();
-    if(currentTime > EVENING || currentTime < MORNING){ //Nachteinspeisung
-      dpm8624.power(false);
-      if(currentState.batStatus > 3){
-        switchRelay(true, true);
-      }else{
-        switchRelay(true, false);  
+    if (currentTime > EVENING || currentTime < MORNING)
+    { // Nachteinspeisung
+      if (currentState.batStatus > 0)
+      { // battery can provide power, so let's do it
+        if (!currentState.relay_out)
+        { // first time switch on
+          sendMessage(String("Switch Inverter on ") + String(currentState.formattedTime));
+        }
+        switchRelay(false, true, &currentState);
       }
-    }else{ //Tagsteuerung
+      else
+      {
 
+        if (currentState.relay_out)
+        { // first time switch off
+          sendMessage(String("Switch Inverter off ") + String(currentState.formattedTime));
+        }
+        switchRelay(false, false, &currentState);
+      }
     }
+    else
+    { // Tagsteuerung
+      switchRelay(true, false, &currentState);
+      // switchRelay(true, true, &currentState); //only for manual feeding
+
+      if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD))
+      { // Einspeisung
+        float isOn = dpm8624.read('p');
+        float current = dpm8624.read('c');
+        if (isOn == 0.0)
+        { // nicht eingeschaltet
+          dpm8624.write('c', 0.1);
+          dpm8624.power(true);
+        }
+        else
+        {
+          float voltage = dpm8624.read('v');
+          if (voltage < (DEFAULT_BAT_VOLTAGE - 0.2) || current < 0.2)
+          { // prevent switch to constant voltage
+            delay(10);
+            //  dpm8624.write('v', DEFAULT_BAT_VOLTAGE+0.7);
+            //  Serial.printf("setVoltage: %f\n",DEFAULT_BAT_VOLTAGE+0.7);
+            delay(10);
+          }
+
+          int faktor = (-1 * currentState.flatPower) % DEFAULT_POWER_THRESHOLD;
+          Serial.printf("PowerFaktor: %i\n", faktor);
+          //          current += 0.1; // gehe hoch
+          current += faktor * 0.1;
+          dpm8624.write('c', current);
+          Serial.printf("setCurrent: %f\n", current);
+          delay(10);
+          dpm8624.power(true);
+        }
+      }
+      else
+      { // evtl. keine Einspeisung mehr
+        if (currentState.flatPower >= 0)
+        {
+          float isOn = dpm8624.read('p');
+          float current = dpm8624.read('c');
+          Serial.printf("isOn: %f, current: %f\n", isOn, current);
+          if (isOn > 0.0)
+          { // eingeschaltet
+            if (current >= 0.2)
+            { // geht noch runter
+              Serial.println("gehe runter...");
+              current -= 0.1;
+              dpm8624.write('c', current);
+            }
+            else
+            {
+              Serial.println("schalte ab...");
+              dpm8624.power(false);
+            }
+          }
+          else
+          {
+            // fine, no lader
+          }
+        }
+        else
+        {
+          // fine, lader in optimum
+        }
+      }
+    }
+    if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE)
+    {
+      dpm8624.power(false);
+    }
+    delay(500);
+    esp_task_wdt_reset();
+    announceToHomeAssistant();
+    debugState(&currentState);
   }
 }
 
@@ -572,20 +661,23 @@ void loop()
 {
   esp_task_wdt_reset();
   printLocalTime(&currentState);
-
-  if (tickerC > 0)
-    tickerC--;
-  if (tickerC == 0 && currentState.flatPower > 1500)
-  {
-    tickerC = 60 * 10; // 10 Minuten
-    esp_task_wdt_reset();
-    Serial.println("Stromover1");
-    Serial.println(currentState.flatPower);
-    Serial.println("Stromover2");
-    string msg = "Verbrauch über 1,5KW - " + std::to_string(currentState.flatPower);
-    Serial.println(msg.c_str());
-    sendMessage(String(msg.c_str()));
-  }
+  // dpm8624.write('c',2.5);
+  // dpm8624.power(false);
+  /*
+    if (tickerC > 0)
+      tickerC--;
+    if (tickerC == 0 && currentState.flatPower > 1500)
+    {
+      tickerC = 60 * 10; // 10 Minuten
+      esp_task_wdt_reset();
+      Serial.println("Stromover1");
+      Serial.println(currentState.flatPower);
+      Serial.println("Stromover2");
+      string msg = "Verbrauch über 1,5KW - " + std::to_string(currentState.flatPower);
+      Serial.println(msg.c_str());
+      sendMessage(String(msg.c_str()));
+    }
+    */
   ArduinoOTA.handle();
   // toggleRelayPowerIn();
   esp_task_wdt_reset();
