@@ -1,6 +1,6 @@
 /*
   https://github.com/Lotiq/DPM8600
-  DPM8600.h - Library for communicating with DPM_8600 series power converters. Works for TTL DPM8600s only. 
+  DPM8600.h - Library for communicating with DPM_8600 series power converters. Works for TTL DPM8600s only.
   Created by Timothy Lobiak, February 15, 2020.
   Released into the public domain.
 
@@ -15,7 +15,7 @@
   power(on) - Turning the power on and off. Returns [Int] 1 on success, or negative error number on error.
     * on - [Bool] - True for power on, false for power off.
 
-  write(cmd, value) - writing command. CMD is a character, upper or lower case that designates the command to be used. Value is the value that is being set. 
+  write(cmd, value) - writing command. CMD is a character, upper or lower case that designates the command to be used. Value is the value that is being set.
     * 'v' or 'V' - [Float] - max voltage in volts
     * 'c' or 'C' - [Float] - max current in amps
     * 'p' or 'P' - Same as method 'power(on)'. 1 for on, 0 for off, anything else is an error
@@ -58,26 +58,26 @@
 
 class DPM8600
 {
-  public:
-    DPM8600(int8_t address, State *state);
-    int begin(HardwareSerial &serial, int8_t maxRetry = 3);
-    //set Default Values and print some serail start informations
-    void setupDPM(float initialVoltage_V, float initialCurrent_A);
-    int power(bool on);
-    int write(char cmd, float value);
-    int writeVC(float v, float c); 
-    float read(char cmd);
-    //valculate VA Power, read temperature and set the Value to state Object!!!
-    void updateStatus();
+public:
+  DPM8600(int8_t address, State *state);
+  int begin(HardwareSerial &serial, int8_t maxRetry = 3);
+  // set Default Values and print some serail start informations
+  void setupDPM(float initialVoltage_V, float initialCurrent_A);
+  int power(bool on);
+  int write(char cmd, float value);
+  int writeVC(float v, float c);
+  float read(char cmd);
+  // valculate VA Power, read temperature and set the Value to state Object!!!
+  void updateStatus();
 
-  private:
-    bool listen(String &response);
-    float processString(String str);
-    
-    HardwareSerial *_serial;
-    int8_t _maxRetry;
-    String _address;
-    State *status;
+private:
+  bool listen(String &response);
+  float processString(String str);
+
+  HardwareSerial *_serial;
+  int8_t _maxRetry;
+  String _address;
+  State *status;
 };
 
 #endif
