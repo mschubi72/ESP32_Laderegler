@@ -6,6 +6,9 @@
 
 #include <esp_task_wdt.h>
 
+#define DEBUGLEVEL DEBUGLEVEL_VERBOSE
+#include "debug.h"
+
 using namespace std;
 
 #define WDT_TIMEOUT 5 // 5 seconds WDT
@@ -40,8 +43,8 @@ void sendMessage(String message)
 
   // Data to send with HTTP POST
   String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
-  Serial.println("Message URL:");
-  Serial.println(url);
+  debugV("Message URL:");
+  debuglnV(url.c_str());
   esp_task_wdt_reset();
 
   HTTPClient http;
@@ -54,13 +57,13 @@ void sendMessage(String message)
   int httpResponseCode = http.POST(url);
   if (httpResponseCode == 200)
   {
-    Serial.println("Message sent successfully");
+    debuglnV("Message sent successfully");
   }
   else
   {
-    Serial.println("Error sending the message");
-    Serial.print("HTTP response code: ");
-    Serial.println(httpResponseCode);
+    debuglnE("Error sending the message");
+    debugE("HTTP response code: ");
+    debuglnE(httpResponseCode);
   }
 
   // Free resources
@@ -95,9 +98,9 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
   }
   else
   {
-    Serial.println(" Error sending the message");
-    Serial.println("HTTP response code: ");
-    Serial.println(httpResponseCode);
+    debuglnE("Error sending the message");
+    debugE("HTTP response code: ");
+    debuglnE(httpResponseCode);
   }
   // Free resources
   http.end();
@@ -116,9 +119,9 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
   }
   else
   {
-    Serial.println(" Error sending the message");
-    Serial.println("HTTP response code: ");
-    Serial.println(httpResponseCode);
+    debuglnE("Error sending the message");
+    debugE("HTTP response code: ");
+    debuglnE(httpResponseCode);
   }
 
   // Free resources
@@ -249,10 +252,10 @@ void onMQTTMessage(
 void processStateJson(char *topic, char *payload)
 {
   StaticJsonDocument<512> jsonBuffer;
-  DEBUG_PRINT("Topic: ");
-  DEBUG_PRINTLN(topic);
-  DEBUG_PRINT("Payload: ");
-  DEBUG_PRINTLN(payload);
+  debugD("Topic: ");
+  debuglnD(topic);
+  debugD("Payload: ");
+  debuglnD(payload);
   int16_t watt = 0;
 
   // JsonObject& root = jsonBuffer.parseObject(payload);
@@ -272,7 +275,7 @@ void processStateJson(char *topic, char *payload)
 
     if (root.containsKey("Time"))
     {
-      DEBUG_PRINTLN(root["Time"].as<const char *>());
+      debuglnV(root["Time"].as<const char *>());
     }
 
     if (root.containsKey("SGMDD"))
@@ -511,7 +514,7 @@ void printLocalTime(State *state)
   char buffer[35];
   if (!getLocalTime(&timeinfo))
   {
-    Serial.println("Failed to obtain time");
+    debuglnE("Failed to obtain time");
     return;
   }
   strftime(buffer, 35, "%d.%m.%Y %H:%M:%S", &timeinfo);
@@ -532,16 +535,16 @@ void printLocalTime(State *state)
 
 void debugState(State *state)
 {
-  Serial.printf("\n-------- State %s ----------\n", state->formattedTime);
-  Serial.printf("\tBat Status: %i, Voltage: %fV, Ladeleistung: %iW(Raw)/%iW(DPM)\n", state->batStatus, state->batVoltage, state->chargePowerRaw, state->chargePower);
-  Serial.printf("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
-  Serial.printf("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C, DPM: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter, state->tempDpm);
-  Serial.printf("\tProcessed: %s\n", state->processed ? "true" : "false");
-  Serial.printf("\tRelay_In: %s, Relay_Out: %s\n\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
+  debugfD("-------- State %s ----------\n", state->formattedTime);
+  debugfD("\tBat Status: %i, Voltage: %fV, Ladeleistung: %iW(Raw)/%iW(DPM)\n", state->batStatus, state->batVoltage, state->chargePowerRaw, state->chargePower);
+  debugfD("\tTemp Batterie1: %.1f°C, Batterie2: %.1f°C, Inverter: %.1f°C, DPM: %.1f°C\n", state->tempBat1, state->tempBat2, state->tempInverter, state->tempDpm);
+  debugfD("\tEinspeiseleistung: %iW, Zähler: %iW, Solarleistung: %iW\n", state->feedPowerBat, state->flatPower, state->solarPower);
+  debugfD("\tProcessed: %s\n", state->processed ? "true" : "false");
+  debugfD("\tRelay_In: %s, Relay_Out: %s\n\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
   esp_task_wdt_reset();
-  Serial.printf("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
-                dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
-  Serial.printf("\tTimecode: %d\n", currentTime);
+  debugfD("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
+          dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
+  debugfD("\tTimecode: %d\n", currentTime);
   esp_task_wdt_reset();
 }
 
@@ -553,45 +556,69 @@ void doAction()
   }
   else
   { // has to be process
-    Serial.println("Must be processed...");
+
+    debuglnD("Must be processed...");
     debugState(&currentState);
     currentState.processed = true;
     if (currentTime > EVENING || currentTime < MORNING)
     { // Nachteinspeisung
-      if (currentState.batStatus > 0)
+      debugfV("BatStatus: %i\n", currentState.batStatus);
+      if (currentState.batStatus > 1)
       { // battery can provide power, so let's do it
         if (!currentState.relay_out)
         { // first time switch on
+          debuglnV("vor sendMessage InverterOn");
           sendMessage(String("Switch Inverter on ") + String(currentState.formattedTime));
+          debuglnV("nach sendMessage InverterOn");
         }
+        esp_task_wdt_reset();
+        debuglnV("vor SwitchRelay");
         switchRelay(false, true, &currentState);
+        debuglnV("nach SwitchRelay");
       }
       else
       {
+        debugfV("RelayState: %i\n", currentState.relay_out);
 
         if (currentState.relay_out)
         { // first time switch off
+          debuglnV("vor sendMessage InverterOff");
           sendMessage(String("Switch Inverter off ") + String(currentState.formattedTime));
         }
+        debuglnV("nach sendMessage InverterOff");
+
+        esp_task_wdt_reset();
+        debuglnV("vor SwitchRelay");
         switchRelay(false, false, &currentState);
+        debuglnV("nach SwitchRelay");
       }
     }
     else
     { // Tagsteuerung
+      debuglnV("vor SwitchRelay");
       switchRelay(true, false, &currentState);
+      debuglnV("nach SwitchRelay");
+
       // switchRelay(true, true, &currentState); //only for manual feeding
 
       if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD))
       { // Einspeisung
+        debuglnV("--> Einspeisung");
+
         float isOn = dpm8624.read('p');
         float current = dpm8624.read('c');
         if (isOn == 0.0)
         { // nicht eingeschaltet
+          debuglnV("--> Einspeisung starten");
+
           dpm8624.write('c', 0.1);
           dpm8624.power(true);
+          debuglnV("<-- Einspeisung starten");
         }
         else
         {
+          debuglnV("--> Einspeisung erhöhen");
+
           float voltage = dpm8624.read('v');
           if (voltage < (DEFAULT_BAT_VOLTAGE - 0.2) || current < 0.2)
           { // prevent switch to constant voltage
@@ -602,51 +629,64 @@ void doAction()
           }
 
           int faktor = (-1 * currentState.flatPower) % DEFAULT_POWER_THRESHOLD;
-          Serial.printf("PowerFaktor: %i\n", faktor);
+          debugfV("PowerFaktor: %i\n", faktor);
           //          current += 0.1; // gehe hoch
           current += faktor * 0.1;
           dpm8624.write('c', current);
-          Serial.printf("setCurrent: %f\n", current);
+          debugfV("setCurrent: %f\n", current);
           delay(10);
           dpm8624.power(true);
+          debuglnV("<-- Einspeisung erhöhen");
         }
+        debuglnV("<-- Einspeisung");
       }
       else
       { // evtl. keine Einspeisung mehr
         if (currentState.flatPower >= 0)
         {
+          debuglnV("--> evtl. keine Einspeisung");
+
           float isOn = dpm8624.read('p');
           float current = dpm8624.read('c');
-          Serial.printf("isOn: %f, current: %f\n", isOn, current);
+          debugfV("isOn: %f, current: %f\n", isOn, current);
           if (isOn > 0.0)
           { // eingeschaltet
             if (current >= 0.2)
             { // geht noch runter
-              Serial.println("gehe runter...");
+              debuglnV("--> Einspeisung erniedrigen");
+
               current -= 0.1;
               dpm8624.write('c', current);
+              debuglnV("<-- Einspeisung erniedrigen");
             }
             else
             {
-              Serial.println("schalte ab...");
+              debuglnV("--> Einspeisung abschalten");
               dpm8624.power(false);
+              debuglnV("<-- Einspeisung abschalten");
             }
           }
           else
           {
             // fine, no lader
+            debuglnV("<--> all fine, keine Ladung");
           }
+          debuglnV("<-- keine Einspeisung");
         }
         else
         {
           // fine, lader in optimum
+          debuglnV("<--> all fine, Ladung optimal");
         }
       }
     }
     if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE)
     {
+      debuglnV("--> Ladung abschalten, Bat voll");
       dpm8624.power(false);
+      debuglnV("<-- Ladung abschalten, Bat voll");
     }
+    esp_task_wdt_reset();
     delay(500);
     esp_task_wdt_reset();
     announceToHomeAssistant();

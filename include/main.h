@@ -54,13 +54,13 @@ typedef struct
     int16_t flatPower = 0;       // Power meter in/out Watt. if < 0 then solar power feed is larger than power usage
     uint16_t chargePowerRaw = 0; // Used power for charging Watt. Primary with all losses
     uint16_t chargePower = 1;    // Used power for charging Watt. Volt*Ampere on charger
-    int16_t feedPowerBat = 0;   // feed power of battery -> output is negativ Value!!!
+    int16_t feedPowerBat = 0;    // feed power of battery -> output is negativ Value!!!
     float tempBat1 = 0.0;        // Bat case 1 temperature
     float tempBat2 = 0.0;        // Bat case 2 temperature
     float tempInverter = 0.0;    // Inverter temperature
     float tempDpm = 0.0;         // DPM temperature
     bool processed = false;      // set false if value of flat power consumtion is set. So async processes is informed if there someting to do...
-    bool relay_in = false;       
+    bool relay_in = false;
     bool relay_out = false;
     char *formattedTime;
 } State;

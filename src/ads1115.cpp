@@ -64,17 +64,18 @@ void Ads1115::updateVoltage()
         {
             status->batStatus = 3;
         }
-        else if (status->batVoltage > BAT_30)
+        else if (status->batVoltage > BAT_20)
         {
             status->batStatus = 2;
         }
-        else if (status->batVoltage > BAT_20)
+        else if (status->batVoltage > BAT_EMPTY)
         {
             status->batStatus = 1;
         }
         else
         {
             status->batStatus = 0;
+            Serial.printf("->BatStatus in Case: %i mit %fV\n", status->batStatus, status->batVoltage);
         }
     }
 }
