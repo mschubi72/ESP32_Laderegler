@@ -54,7 +54,7 @@ const uint16_t OTA_PORT = 3232;
 #define DEFAULT_POWER_THRESHOLD 20
 // #define BAT_EMPTY 25.6
 #define BAT_EMPTY 24.2
-#define BAT_20 25.8
+#define BAT_20 24.8 //25.8
 #define BAT_30 26.0
 #define BAT_40 26.2
 #define BAT_70 26.4
