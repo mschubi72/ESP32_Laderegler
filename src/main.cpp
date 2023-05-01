@@ -11,7 +11,7 @@
 
 using namespace std;
 
-#define WDT_TIMEOUT 5 // 5 seconds WDT
+#define WDT_TIMEOUT 10 // 5 seconds WDT
 
 String phoneNumber = PHONENUMBER;
 String apiKey = APIKEY;
@@ -53,6 +53,8 @@ void sendMessage(String message)
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
+  esp_task_wdt_reset();
+  delay(5);
   // Send HTTP POST request
   int httpResponseCode = http.POST(url);
   if (httpResponseCode == 200)
@@ -65,7 +67,7 @@ void sendMessage(String message)
     debugE("HTTP response code: ");
     debuglnE(httpResponseCode);
   }
-
+  esp_task_wdt_reset();
   // Free resources
   http.end();
 }
@@ -89,6 +91,9 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
   http.begin(urlIn);
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  esp_task_wdt_reset();
+  delay(5);
   // Send HTTP POST request
   int httpResponseCode = http.POST(urlIn);
   if (httpResponseCode == 200)
@@ -102,6 +107,8 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
     debugE("HTTP response code: ");
     debuglnE(httpResponseCode);
   }
+  esp_task_wdt_reset();
+  delay(5);
   // Free resources
   http.end();
 
@@ -110,6 +117,10 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
   http.begin(urlOut);
   // Specify content-type header
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  esp_task_wdt_reset();
+  delay(5);
+  
   // Send HTTP POST request
   httpResponseCode = http.POST(urlIn);
   if (httpResponseCode == 200)
@@ -124,6 +135,7 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
     debuglnE(httpResponseCode);
   }
 
+  esp_task_wdt_reset();
   // Free resources
   http.end();
 }
@@ -246,7 +258,9 @@ void onMQTTMessage(
   char new_payload[len + 1];
   new_payload[len] = '\0';
   strncpy(new_payload, payload, len);
+  esp_task_wdt_reset();
   processStateJson(topic, new_payload);
+  esp_task_wdt_reset();
 }
 
 void processStateJson(char *topic, char *payload)
@@ -272,7 +286,8 @@ void processStateJson(char *topic, char *payload)
     }
 
     JsonObject root = jsonBuffer.as<JsonObject>(); // get the root object
-
+    esp_task_wdt_reset();
+    delay(5);
     if (root.containsKey("Time"))
     {
       debuglnV(root["Time"].as<const char *>());
@@ -292,6 +307,8 @@ void processStateJson(char *topic, char *payload)
     watt = atoi(payload);
     // Serial.println("Solarleistung: " + String(watt));
     currentState.solarPower = watt;
+    esp_task_wdt_reset();
+    delay(5);
   }
   else if (strcmp(topic, MQTT_TOPIC_POWER_IN) == 0) // Ladeleistung
   {
@@ -379,7 +396,9 @@ void announceToHomeAssistant()
   // Serial.println(payload);
   //  Serial.println(sizeof payload);
   esp_task_wdt_reset();
+  delay(5);
   mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
+  esp_task_wdt_reset();
 }
 
 void setup()
@@ -565,6 +584,7 @@ void doAction()
       debugfV("BatStatus: %i\n", currentState.batStatus);
       if (currentState.batStatus > 1)
       { // battery can provide power, so let's do it
+        // >1 -> we have a switch hysteresis
         if (!currentState.relay_out)
         { // first time switch on
           debuglnV("vor sendMessage InverterOn");
@@ -572,12 +592,17 @@ void doAction()
           debuglnV("nach sendMessage InverterOn");
         }
         esp_task_wdt_reset();
-        debuglnV("vor SwitchRelay");
+        debuglnV("vor SwitchRelay on");
         switchRelay(false, true, &currentState);
-        debuglnV("nach SwitchRelay");
+        debuglnV("nach SwitchRelay on");
+      }
+      else if (currentState.batStatus == 1)
+      {
+        // do nothing
+        debuglnV("batStatus == 1 - do nothing.");
       }
       else
-      {
+      { // Bat Empty -> switch off
         debugfV("RelayState: %i\n", currentState.relay_out);
 
         if (currentState.relay_out)
@@ -588,9 +613,9 @@ void doAction()
         debuglnV("nach sendMessage InverterOff");
 
         esp_task_wdt_reset();
-        debuglnV("vor SwitchRelay");
+        debuglnV("vor SwitchRelay off");
         switchRelay(false, false, &currentState);
-        debuglnV("nach SwitchRelay");
+        debuglnV("nach SwitchRelay off");
       }
     }
     else
