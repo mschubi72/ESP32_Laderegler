@@ -482,7 +482,7 @@ void setup()
   }
   Serial.println(" done.");
 
-  // setupOTA(WIFI_HOSTNAME, OTA_PORT);
+  setupOTA(WIFI_HOSTNAME, OTA_PORT);
 
   dpm8624.begin(Serial2);
   dpm8624.setupDPM(DEFAULT_BAT_VOLTAGE, DEFAULT_BAT_CURRENT);
