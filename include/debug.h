@@ -144,3 +144,23 @@ std::string debugStr("");
     {                   \
     } while (0)
 #endif
+
+
+#ifdef MQTTDEBUG
+#define debugMqtt(x)              \
+    traceStamp("D", x, false); \
+    Serial.print(x);
+#define debuglnMqtt(x)           \
+    traceStamp("D", x, true); \
+    Serial.println(x)
+#define debugfMqtt(x, ...)       \
+    traceStamp("D", x, true); \
+    Serial.printf("" x, __VA_ARGS__)
+#else
+#define debugMqtt(x)   /* Nothing to see here */
+#define debuglnMqtt(x) // Or here
+#define debugfMqtt(x, ...) \
+    do                  \
+    {                   \
+    } while (0)
+#endif

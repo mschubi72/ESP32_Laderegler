@@ -7,6 +7,8 @@
 #include <esp_task_wdt.h>
 
 #define DEBUGLEVEL DEBUGLEVEL_VERBOSE
+// #define MQTTDEBUG
+
 #include "debug.h"
 
 using namespace std;
@@ -120,7 +122,7 @@ void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
 
   esp_task_wdt_reset();
   delay(5);
-  
+
   // Send HTTP POST request
   httpResponseCode = http.POST(urlIn);
   if (httpResponseCode == 200)
@@ -266,10 +268,10 @@ void onMQTTMessage(
 void processStateJson(char *topic, char *payload)
 {
   StaticJsonDocument<512> jsonBuffer;
-  debugD("Topic: ");
-  debuglnD(topic);
-  debugD("Payload: ");
-  debuglnD(payload);
+  debugMqtt("Topic: ");
+  debuglnMqtt(topic);
+  debugMqtt("Payload: ");
+  debuglnMqtt(payload);
   int16_t watt = 0;
 
   // JsonObject& root = jsonBuffer.parseObject(payload);
@@ -290,7 +292,7 @@ void processStateJson(char *topic, char *payload)
     delay(5);
     if (root.containsKey("Time"))
     {
-      debuglnV(root["Time"].as<const char *>());
+      debuglnMqtt(root["Time"].as<const char *>());
     }
 
     if (root.containsKey("SGMDD"))
@@ -331,7 +333,7 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_in = false;
     }
-    Serial.println("Relay Lader: " + String(payload));
+    // Serial.println("Relay Lader: " + String(payload));
   }
   else if (strcmp(topic, MQTT_TOPIC_RELAY_OUT) == 0) // Relay Status Einspeisung
   {
@@ -343,12 +345,12 @@ void processStateJson(char *topic, char *payload)
     {
       currentState.relay_out = false;
     }
-    Serial.println("Relay Einspeisung: " + String(payload));
+    // Serial.println("Relay Einspeisung: " + String(payload));
   }
   else
   {
-    Serial.print("*** Unknown Topic ***");
-    Serial.println(topic);
+    debuglnE("*** Unknown Topic ***");
+    debuglnE(topic);
   }
   /*
         if (root.containsKey("brightness")) {
@@ -397,7 +399,8 @@ void announceToHomeAssistant()
   //  Serial.println(sizeof payload);
   esp_task_wdt_reset();
   delay(5);
-  mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
+  uint16_t returnval = mqttClient.publish(MQTT_TOPIC_STATUS, 2, true, payload);
+  debugfMqtt("mqttClient.publish return %i\n", returnval);
   esp_task_wdt_reset();
 }
 
@@ -581,7 +584,7 @@ void doAction()
     currentState.processed = true;
     if (currentTime > EVENING || currentTime < MORNING)
     { // Nachteinspeisung
-      debugfV("BatStatus: %i\n", currentState.batStatus);
+      debugfV("BatStatus: %i  (%i)\n", currentState.batStatus, currentTime);
       if (currentState.batStatus > 1)
       { // battery can provide power, so let's do it
         // >1 -> we have a switch hysteresis
@@ -620,9 +623,9 @@ void doAction()
     }
     else
     { // Tagsteuerung
-      debuglnV("vor SwitchRelay");
+      debuglnV("vor SwitchRelay on,off");
       switchRelay(true, false, &currentState);
-      debuglnV("nach SwitchRelay");
+      debuglnV("nach SwitchRelay on,off");
 
       // switchRelay(true, true, &currentState); //only for manual feeding
 
