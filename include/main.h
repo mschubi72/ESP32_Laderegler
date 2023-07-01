@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <stdint.h>
 #include <AsyncMqttClient.h>
+#include <ESPAsyncWebServer.h>
 #include <Ticker.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -16,6 +17,7 @@
 #include <UrlEncode.h>
 #include <time.h>
 
+#include "SPIFFS.h"
 #include "configuration.h"
 #include "version.h"
 #include "ota.h"

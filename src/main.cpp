@@ -5,6 +5,8 @@
 #include "DPM8600.h"
 
 #include <esp_task_wdt.h>
+#include <Preferences.h>
+
 
 #define DEBUGLEVEL DEBUGLEVEL_VERBOSE
 // #define MQTTDEBUG
@@ -35,10 +37,19 @@ DS18B20Stat ds18b20status = NULL;
 Ads1115 ads1115 = NULL;
 // Dpm8624 dpm8624 = NULL;
 DPM8600 dpm8624 = DPM8600(1, &currentState);
-;
+
 
 bool ipReady = false;
 u_int currentTime = 0;
+
+const char* CHARGE_ENABLED = "CE";
+const char* INVERTER_ENABLED = "IE";
+bool chargeEnabled = true; //is battery charging enabled
+bool inverterEnabled = true; //is inverter for feeding enabled
+
+Preferences preferences;
+
+AsyncWebServer webserver(11111);
 
 void sendMessage(String message)
 {
@@ -206,6 +217,7 @@ void onWiFiEvent(WiFiEvent_t event)
 
 void connectToWiFi()
 {
+  WiFi.setHostname(WIFI_HOSTNAME); //has to be before calling WiFi.mode....
   WiFi.mode(WIFI_STA);
 
   // FIX FOR USING 2.3.0 CORE (only .begin if not connected)
@@ -213,7 +225,6 @@ void connectToWiFi()
     return;
 
   // Serial.println("WIFI: Connecting to WiFi...");
-  WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
@@ -404,6 +415,58 @@ void announceToHomeAssistant()
   esp_task_wdt_reset();
 }
 
+// Replaces placeholder for main html page
+String processMainHtml(const String& var){
+  /*
+ 
+  debugfD("\tRelay_In: %s, Relay_Out: %s\n\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
+  esp_task_wdt_reset();
+  debugfD("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
+          dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
+  debugfD("\tTimecode: %d\n", currentTime);
+  debugfD("\tCharger enabled: %s; Inverter enabled: %s\n", chargeEnabled ? "true" : "false", inverterEnabled ? "true" : "false" );
+  esp_task_wdt_reset();
+}
+  */
+
+  if(var == "BAT_STATUS"){
+    return String(currentState.batStatus);
+  }else if(var == "BAT_VOLTAGE"){
+    return String(currentState.batVoltage);
+  }else if(var == "TEMP1"){
+    return String(currentState.tempBat1);
+  }else if(var == "TEMP2"){
+    return String(currentState.tempBat2);
+  }else if(var == "SOLAR"){
+    return String(currentState.solarPower);
+  }else if(var == "CHARGE"){
+    return String(currentState.chargePower);
+  }else if(var == "FEED"){
+    return String(currentState.feedPowerBat);
+  }else if(var == "FLAT"){
+    return String(currentState.flatPower);
+  }else if(var == "CHARGE_E"){
+    return chargeEnabled ? String("true") : String("false");
+  }else if(var == "INV_E"){
+    return inverterEnabled ? String("true") : String("false");
+  }
+
+  return String();
+}
+
+void prepareWebServer(){
+/*
+  webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", "Hello from server 1");
+});
+*/
+webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html", String(), false, processMainHtml);
+  });
+  webserver.begin();
+  
+}
+
 void setup()
 {
   pinMode(22, OUTPUT); // LED
@@ -466,6 +529,13 @@ void setup()
 
   Serial.printf("\nBooting setup Version: %s / %s\n", __DATE__, __TIME__);
 
+  // Initialize SPIFFS
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+  Serial.println("SPIFFS initialized...");
+  
   setupRS485();
   WiFi.onEvent(onWiFiEvent);
   mqttClient.onConnect(onMQTTConnect);
@@ -502,6 +572,11 @@ void setup()
   setenv("TZ", MY_TZ, 1); // Set environment variable with your time zone
   tzset();
 
+  preferences.begin("laderegler", false);
+  chargeEnabled = preferences.getBool(CHARGE_ENABLED, true);
+  inverterEnabled = preferences.getBool(INVERTER_ENABLED, true);
+  preferences.end();
+
   esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);               // add current thread to WDT watch
   esp_task_wdt_reset();
@@ -523,6 +598,7 @@ void setup()
                   { dpm8624.updateStatus(); });
   //  debugTimer.attach(5, []()
   //                    { debugState(&currentState); });
+  prepareWebServer();
 }
 
 // the loop function runs over and over again forever
@@ -567,6 +643,7 @@ void debugState(State *state)
   debugfD("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
           dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
   debugfD("\tTimecode: %d\n", currentTime);
+  debugfD("\tCharger enabled: %s; Inverter enabled: %s\n", chargeEnabled ? "true" : "false", inverterEnabled ? "true" : "false" );
   esp_task_wdt_reset();
 }
 

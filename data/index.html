@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>ESP Lader</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <style>
+    .textbox { padding: 1em; border: 1px solid #000; background: #eee; color: #333; }
+    .fieldsetclass { width: fit-content; float: left }
+    
+  </style>
+  <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+  <script>
+    $( function() {
+      $( ".controlgroup" ).controlgroup()
+      $( ".controlgroup-vertical" ).controlgroup({
+        "direction": "vertical"
+      });
+    } );
+   
+  </script>
+</head>
+
+<body>
+    <h2>ESP Lader Status</h2>
+    <div class="widget">
+        <fieldset class="fieldsetclass">
+          <legend>Battery</legend>
+          <div class="controlgroup">
+            <div class="ui-corner-all textbox">
+                Status: %BAT_STATUS%
+            </div>
+            <div class="ui-corner-all textbox">
+                Voltage: %BAT_VOLTAGE% V
+            </div>
+            <div class="ui-corner-all textbox">
+                Temperatur 1: %TEMP1% °C
+            </div>
+            <div class="ui-corner-all textbox">
+                Temperatur 2: %TEMP2% °C
+            </div>
+          </div>
+        </fieldset>
+        <fieldset class="fieldsetclass">
+              <legend>Power</legend>
+              <div class="controlgroup">
+                <div class="ui-corner-all textbox">
+                    Solarpower: %SOLAR% W
+                </div>
+                <div class="ui-corner-all textbox">
+                    Ladeleistung: %CHARGE% W
+                </div>
+                <div class="ui-corner-all textbox">
+                    Einspeisung von Bat: %FEED% W
+                </div>
+                <div class="ui-corner-all textbox">
+                    Zähler: %FLAT% W
+                </div>
+              </div>
+            </fieldset>
+            <fieldset class="fieldsetclass">
+                <legend>Funktionen</legend>
+                <div class="controlgroup">
+                  <div class="ui-corner-all textbox">
+                      Akku Laden eingeschaltet: %CHARGE_E% 
+                  </div>
+                  <div class="ui-corner-all textbox">
+                      Inverter eingeschaltet: %INV_E% 
+                  </div>
+              </fieldset>
+  
+      </div>
+  </body>
+  
+  </html>
