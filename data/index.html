@@ -10,7 +10,7 @@
   <style>
     .textbox { padding: 1em; border: 1px solid #000; background: #eee; color: #333; }
     .fieldsetclass { width: fit-content; float: left }
-    
+    #footer {clear: both; padding: 1em;}
   </style>
   <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
@@ -72,7 +72,13 @@
                       Inverter eingeschaltet: %INV_E% 
                   </div>
               </fieldset>
-  
+      </div>
+      <br>
+      <div class="widget"  id="footer">
+        <p>
+          <a href="/togglecharger" class="ui-button ui-widget ui-corner-all" >Switch Charger %SW_CH%</a>
+          <a href="/toggleinverter" class="ui-button ui-widget ui-corner-all" >Switch Inverter %SW_INV%</a>
+        </p>
       </div>
   </body>
   

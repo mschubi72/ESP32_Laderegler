@@ -7,7 +7,6 @@
 #include <esp_task_wdt.h>
 #include <Preferences.h>
 
-
 #define DEBUGLEVEL DEBUGLEVEL_VERBOSE
 // #define MQTTDEBUG
 
@@ -38,14 +37,13 @@ Ads1115 ads1115 = NULL;
 // Dpm8624 dpm8624 = NULL;
 DPM8600 dpm8624 = DPM8600(1, &currentState);
 
-
 bool ipReady = false;
 u_int currentTime = 0;
 
-const char* CHARGE_ENABLED = "CE";
-const char* INVERTER_ENABLED = "IE";
-bool chargeEnabled = true; //is battery charging enabled
-bool inverterEnabled = true; //is inverter for feeding enabled
+const char *CHARGE_ENABLED = "CE";
+const char *INVERTER_ENABLED = "IE";
+bool chargeEnabled = true;   // is battery charging enabled
+bool inverterEnabled = true; // is inverter for feeding enabled
 
 Preferences preferences;
 
@@ -217,7 +215,7 @@ void onWiFiEvent(WiFiEvent_t event)
 
 void connectToWiFi()
 {
-  WiFi.setHostname(WIFI_HOSTNAME); //has to be before calling WiFi.mode....
+  WiFi.setHostname(WIFI_HOSTNAME); // has to be before calling WiFi.mode....
   WiFi.mode(WIFI_STA);
 
   // FIX FOR USING 2.3.0 CORE (only .begin if not connected)
@@ -416,9 +414,10 @@ void announceToHomeAssistant()
 }
 
 // Replaces placeholder for main html page
-String processMainHtml(const String& var){
+String processMainHtml(const String &var)
+{
   /*
- 
+
   debugfD("\tRelay_In: %s, Relay_Out: %s\n\n", state->relay_in ? "On" : "Off", state->relay_out ? "On" : "Off");
   esp_task_wdt_reset();
   debugfD("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
@@ -429,42 +428,82 @@ String processMainHtml(const String& var){
 }
   */
 
-  if(var == "BAT_STATUS"){
+  if (var == "BAT_STATUS")
+  {
     return String(currentState.batStatus);
-  }else if(var == "BAT_VOLTAGE"){
+  }
+  else if (var == "BAT_VOLTAGE")
+  {
     return String(currentState.batVoltage);
-  }else if(var == "TEMP1"){
+  }
+  else if (var == "TEMP1")
+  {
     return String(currentState.tempBat1);
-  }else if(var == "TEMP2"){
+  }
+  else if (var == "TEMP2")
+  {
     return String(currentState.tempBat2);
-  }else if(var == "SOLAR"){
+  }
+  else if (var == "SOLAR")
+  {
     return String(currentState.solarPower);
-  }else if(var == "CHARGE"){
+  }
+  else if (var == "CHARGE")
+  {
     return String(currentState.chargePower);
-  }else if(var == "FEED"){
+  }
+  else if (var == "FEED")
+  {
     return String(currentState.feedPowerBat);
-  }else if(var == "FLAT"){
+  }
+  else if (var == "FLAT")
+  {
     return String(currentState.flatPower);
-  }else if(var == "CHARGE_E"){
+  }
+  else if (var == "CHARGE_E")
+  {
     return chargeEnabled ? String("true") : String("false");
-  }else if(var == "INV_E"){
+  }
+  else if (var == "INV_E")
+  {
     return inverterEnabled ? String("true") : String("false");
+  }
+  else if (var == "SW_CH")
+  {
+    return chargeEnabled ? String("Off") : String("On");
+  }
+  else if (var == "SW_INV")
+  {
+    return inverterEnabled ? String("Off") : String("On");
   }
 
   return String();
 }
 
-void prepareWebServer(){
-/*
-  webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "text/plain", "Hello from server 1");
-});
-*/
-webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/index.html", String(), false, processMainHtml);
+void prepareWebServer()
+{
+  /*
+    webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(200, "text/plain", "Hello from server 1");
   });
+  */
+  webserver.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(SPIFFS, "/index.html", String(), false, processMainHtml); });
+  webserver.on("/togglecharger", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+    preferences.begin("laderegler", false);
+    chargeEnabled = !chargeEnabled;
+    preferences.putBool(CHARGE_ENABLED, chargeEnabled);
+    preferences.end();
+    request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); });
+  webserver.on("/toggleinverter", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+    preferences.begin("laderegler", false);
+    inverterEnabled = !inverterEnabled;
+    preferences.putBool(INVERTER_ENABLED, inverterEnabled);
+    preferences.end();
+    request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); });
   webserver.begin();
-  
 }
 
 void setup()
@@ -530,12 +569,13 @@ void setup()
   Serial.printf("\nBooting setup Version: %s / %s\n", __DATE__, __TIME__);
 
   // Initialize SPIFFS
-  if(!SPIFFS.begin(true)){
+  if (!SPIFFS.begin(true))
+  {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
   Serial.println("SPIFFS initialized...");
-  
+
   setupRS485();
   WiFi.onEvent(onWiFiEvent);
   mqttClient.onConnect(onMQTTConnect);
@@ -643,7 +683,7 @@ void debugState(State *state)
   debugfD("\tDPM->V: %f, A: %f, VA: %i, ON: %f, CC: %f, T: %f\n",
           dpm8624.read('v'), dpm8624.read('c'), currentState.chargePower, dpm8624.read('p'), dpm8624.read('s'), dpm8624.read('t'));
   debugfD("\tTimecode: %d\n", currentTime);
-  debugfD("\tCharger enabled: %s; Inverter enabled: %s\n", chargeEnabled ? "true" : "false", inverterEnabled ? "true" : "false" );
+  debugfD("\tCharger enabled: %s; Inverter enabled: %s\n", chargeEnabled ? "true" : "false", inverterEnabled ? "true" : "false");
   esp_task_wdt_reset();
 }
 
@@ -662,7 +702,7 @@ void doAction()
     if (currentTime > EVENING || currentTime < MORNING)
     { // Nachteinspeisung
       debugfV("BatStatus: %i  (%i)\n", currentState.batStatus, currentTime);
-      if (currentState.batStatus > 1)
+      if (currentState.batStatus > 1 && inverterEnabled)
       { // battery can provide power, so let's do it
         // >1 -> we have a switch hysteresis
         if (!currentState.relay_out)
@@ -706,7 +746,7 @@ void doAction()
 
       // switchRelay(true, true, &currentState); //only for manual feeding
 
-      if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD))
+      if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD) && chargeEnabled)
       { // Einspeisung
         debuglnV("--> Einspeisung");
 
@@ -785,7 +825,7 @@ void doAction()
         }
       }
     }
-    if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE)
+    if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE || !chargeEnabled)
     {
       debuglnV("--> Ladung abschalten, Bat voll");
       dpm8624.power(false);
