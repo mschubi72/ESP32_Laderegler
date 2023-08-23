@@ -25,6 +25,35 @@ void Ads1115::setupADS()
     Serial.printf("\tSDA Pin: %i, SCL Pin: %i \n", PIN_ADS_SDA, PIN_ADS_SCL);
 }
 
+uint8_t Ads1115::getCapacityPercent(float voltage)
+{
+  if (voltage < 19.0)
+    return 0;
+  if (voltage > 19.0 && voltage < 21.6)
+    return 0;
+  if (voltage > 21.6 && voltage < 25.6)
+    return 1;
+  if (voltage > 25.6 && voltage < 25.8)
+    return 10;
+  if (voltage > 25.8 && voltage < 26.0)
+    return 20;
+  if (voltage > 26.0 && voltage < 26.2)
+    return 30;
+  if (voltage > 26.2 && voltage < 26.4)
+    return 40;
+  if (voltage > 26.4 && voltage < 26.6)
+    return 70;
+  if (voltage > 26.6 && voltage < 26.8)
+    return 90;
+  if (voltage > 26.8 && voltage < 27.0)
+    return 99;
+  if (voltage > 20.0 && voltage < 30)
+    return 100;
+  if (voltage > 30.0)
+    return 200;
+  return 254;
+}
+
 void Ads1115::updateVoltage()
 {
     float val_01 = ads.readADC(1);
@@ -51,7 +80,8 @@ void Ads1115::updateVoltage()
     { // sometimes Error on reading voltage
         status->batVoltage = tempBat / 100.0;
         // status->batVoltage = roundf(100.0f * status->batVoltage)/100.0f;
-
+        status->batPercent = getCapacityPercent(status->batVoltage);
+  
         if (status->batVoltage > BAT_FULL)
         {
             status->batStatus = 5;
