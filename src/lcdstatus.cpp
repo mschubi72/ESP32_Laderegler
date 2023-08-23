@@ -53,15 +53,16 @@ void LcdStatus::updateFullScreen()
 {
   updateHeaderStatus();
 
-  u8g2.setClipWindow(0, 16, 128, 59);
+  u8g2.setClipWindow(0, 16, 128, 63);
   u8g2.setDrawColor(0);
-  u8g2.drawBox(0, 16, 128, 59);
+  u8g2.drawBox(0, 16, 128, 63);
   u8g2.setDrawColor(1);
 
   u8g2.setFont(u8g2_font_ncenB08_tr);
-  int x = u8g2.getStrWidth(status->formattedTime);
-  x = (128 - x) / 2;
-  u8g2.drawStr(x, 59, status->formattedTime);
+  //int x = u8g2.getStrWidth(status->formattedTime);
+  //x = (128 - x) / 2;
+  u8g2.drawStr(0, 63, status->formattedTime);
+  u8g2.drawStr(90,52, String(status->batPercent).c_str());
 
   u8g2.setFont(u8g2_font_unifont_t_weather);
   u8g2.drawGlyph(0, 40, 0x002e); // Sonne  34
@@ -89,7 +90,7 @@ void LcdStatus::updateFullScreen()
     drawArrows(66, 38, true);
     u8g2.setFont(u8g2_font_battery19_tn);
     u8g2.setDrawColor(1);
-    u8g2.drawGlyph(96, 42, 0x0030 + status->batStatus); // Bat
+    u8g2.drawGlyph(96, 40, 0x0030 + status->batStatus); // Bat
   }
   else
   {
