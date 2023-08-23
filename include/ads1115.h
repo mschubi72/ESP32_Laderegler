@@ -16,6 +16,8 @@ public:
     // init ADS
     void setupADS();
 
+    uint8_t getCapacityPercent(float voltage);
+    
     // get the battery voltage and store in status
     void updateVoltage();
 };
