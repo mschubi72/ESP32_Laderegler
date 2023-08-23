@@ -65,6 +65,7 @@ typedef struct
     bool relay_in = false;
     bool relay_out = false;
     char *formattedTime;
+    uint8_t batPercent = 0;      // LiPo Capacity in Percent
 } State;
 
 // Helpers
