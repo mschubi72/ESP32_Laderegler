@@ -383,12 +383,15 @@ void processStateJson(char *topic, char *payload)
         */
 }
 
+
+
 void announceToHomeAssistant()
 {
   // Serial.println("MQTT: Annoucing to Home Assistant");
 
   //    StaticJsonBuffer<2048> jsonObject;
   StaticJsonDocument<256> mqttstate;
+  
   //   JsonObject& mqttstate = jsonObject.createObject();
   mqttstate["formattedTime"] = currentState.formattedTime;
   mqttstate["batStatus"] = currentState.batStatus;
@@ -401,6 +404,7 @@ void announceToHomeAssistant()
   mqttstate["tempBat2"] = currentState.tempBat2;
   mqttstate["tempInverter"] = currentState.tempInverter;
   mqttstate["tempDpm"] = currentState.tempDpm;
+  mqttstate["batCapPercent"] = currentState.batPercent;
 
   char payload[256];
   serializeJson(mqttstate, payload);
@@ -430,7 +434,7 @@ String processMainHtml(const String &var)
 
   if (var == "BAT_STATUS")
   {
-    return String(currentState.batStatus);
+    return String(currentState.batStatus) + " (" + String(currentState.batPercent) + "&percnt;)";
   }
   else if (var == "BAT_VOLTAGE")
   {
@@ -476,6 +480,14 @@ String processMainHtml(const String &var)
   {
     return inverterEnabled ? String("Off") : String("On");
   }
+  else if (var == "VER")
+  {
+    return String(VERSION);
+  }
+  else if (var == "DATE")
+  {
+    return String(__DATE__);
+  }
 
   return String();
 }
@@ -503,6 +515,33 @@ void prepareWebServer()
     preferences.putBool(INVERTER_ENABLED, inverterEnabled);
     preferences.end();
     request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); });
+  webserver.on("/rebootesp", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+    request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); 
+    ESP.restart(); });
+  webserver.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(200, "text/plain", String(ESP.getFreeHeap())); });
+  webserver.on("/espinfo", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+                String espinfo = "ESP Info\n\nChipCores: " + String(ESP.getChipCores()) + "\n"; 
+                espinfo += "ChipModel: " + String(ESP.getChipModel()) + "\n";
+                espinfo += "ChipRevision: " + String(ESP.getChipRevision()) + "\n";
+                espinfo += "CpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + "\n";
+                espinfo += "CycleCount: " + String(ESP.getCycleCount()) + "\n";
+                espinfo += "FlashChipMode: " + String(ESP.getFlashChipMode()) + "\n";
+                espinfo += "FlashChipSize: " + String(ESP.getFlashChipSize()) + "\n";
+                espinfo += "FlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\n";
+                espinfo += "FreePsram: " + String(ESP.getFreePsram()) + "\n";
+                espinfo += "FreeSketchSpace: " + String(ESP.getFreeSketchSpace()) + "\n";
+                espinfo += "FreeHeap: " + String(ESP.getFreeHeap()) + "\n";
+                espinfo += "HeapSize: " + String(ESP.getHeapSize()) + "\n";
+                espinfo += "PsramSize: " + String(ESP.getPsramSize()) + "\n";
+                espinfo += "SdkVersion: " + String(ESP.getSdkVersion()) + "\n";
+                espinfo += "SketchSize: " + String(ESP.getSketchSize()) + "\n";
+                
+                request->send(200, "text/plain", espinfo); 
+                });
+               
   webserver.begin();
 }
 
