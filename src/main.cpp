@@ -835,6 +835,16 @@ void doAction()
           debugfV("isOn: %f, current: %f\n", isOn, current);
           if (isOn > 0.0)
           { // eingeschaltet
+            if( (current >= 1.3) && (currentState.flatPower > 40) )
+            {
+              //viel Ueberschuss, großer Schritt, bessere Reaktion bei wechselnder Bewoelkung
+              debuglnV("--> Einspeisung viel erniedrigen");
+
+              current -= 1.0;
+              dpm8624.write('c', current);
+              debuglnV("<-- Einspeisung viel erniedrigen");  
+              delay(10);
+            }
             if (current >= 0.2)
             { // geht noch runter
               debuglnV("--> Einspeisung erniedrigen");
