@@ -487,7 +487,11 @@ String processMainHtml(const String &var)
   else if (var == "DATE")
   {
     return String(__DATE__);
+  }else if (var == "CURR_DATE")
+  {
+    return String(currentState.formattedTime);
   }
+
 
   return String();
 }
