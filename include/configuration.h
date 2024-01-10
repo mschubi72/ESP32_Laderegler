@@ -35,7 +35,7 @@ const uint16_t OTA_PORT = 3232;
 // #define MQTT_PORT 1883
 
 // MQTT topics used by this program
-#define MQTT_TOPIC_SENSOR "tele/SGMDD/SENSOR"
+#define MQTT_TOPIC_SENSOR "tele/SGMDD-MS/SENSOR"
 #define MQTT_TOPIC_SOLAR "solarpower/sensor/solarpower_leistung/state"
 #define MQTT_TOPIC_POWER_IN "lader-power/sensor/lader-power_power_in/state"
 #define MQTT_TOPIC_POWER_OUT "lader-power/sensor/lader-power_power_out/state"
