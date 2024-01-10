@@ -30,6 +30,9 @@
 #define DEBUGLEVEL_VERBOSE 4
 #define DEBUGLEVEL_NONE 0
 
+//#define MQTTDEBUG 1
+//#define DEBUGLEVEL DEBUGLEVEL_DEBUGGING
+
 // We want to debug everything! Overide this in your sketch
 #ifndef DEBUGLEVEL
 #define DEBUGLEVEL DEBUGLEVEL_VERBOSE
