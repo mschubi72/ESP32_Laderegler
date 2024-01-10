@@ -49,6 +49,14 @@ Preferences preferences;
 
 AsyncWebServer webserver(11111);
 
+IPAddress local_IP(192, 168, 50, 24);
+IPAddress gateway(192, 168, 50, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress primaryDNS(192, 168, 10, 1);
+IPAddress secondaryDNS(8, 8, 4, 4);
+
+float CHARGE_OVERWRITE = 0.0;
+
 void sendMessage(String message)
 {
 
@@ -86,15 +94,15 @@ void sendMessage(String message)
 void switchRelay(bool switchRelayInOn, bool switchRelayOutOn, State *state)
 {
   // http://192.168.1.87/switch/lader-power_relay_out/turn_on
-  String urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_on";
-  String urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_on";
+  String urlIn = "http://192.168.50.23/switch/lader-power_relay_in/turn_on";
+  String urlOut = "http://192.168.50.23/switch/lader-power_relay_out/turn_on";
   if (!switchRelayInOn)
   {
-    urlIn = "http://192.168.1.87/switch/lader-power_relay_in/turn_off";
+    urlIn = "http://192.168.50.23/switch/lader-power_relay_in/turn_off";
   }
   if (!switchRelayOutOn)
   {
-    urlOut = "http://192.168.1.87/switch/lader-power_relay_out/turn_off";
+    urlOut = "http://192.168.50.23/switch/lader-power_relay_out/turn_off";
   }
 
   // Serial.printf("Switch RelayIn: %s... ", urlIn);
@@ -155,7 +163,7 @@ void toggleRelayPowerIn()
 {
 
   // Data to send with HTTP POST
-  String url = "http://192.168.1.87/switch/lader-power_relay_in/toggle";
+  String url = "http://192.168.50.23/switch/lader-power_relay_in/toggle";
   Serial.println("Message URL:");
   Serial.println(url);
 
@@ -217,7 +225,11 @@ void connectToWiFi()
 {
   WiFi.setHostname(WIFI_HOSTNAME); // has to be before calling WiFi.mode....
   WiFi.mode(WIFI_STA);
-
+  // Configures static IP address
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS))
+  {
+    debuglnE("STA Failed to configure");
+  }
   // FIX FOR USING 2.3.0 CORE (only .begin if not connected)
   if (WiFi.status() == WL_CONNECTED)
     return;
@@ -307,7 +319,7 @@ void processStateJson(char *topic, char *payload)
     if (root.containsKey("SGMDD"))
     {
       int16_t watt = root["SGMDD"]["Momentan"].as<int16_t>();
-      // Serial.println("Momentanverbrauch: " + String(watt));
+      debugfD("Momentanverbrauch: %d", watt);
       currentState.flatPower = watt;
       currentState.processed = false;
     }
@@ -383,15 +395,13 @@ void processStateJson(char *topic, char *payload)
         */
 }
 
-
-
 void announceToHomeAssistant()
 {
   // Serial.println("MQTT: Annoucing to Home Assistant");
 
   //    StaticJsonBuffer<2048> jsonObject;
   StaticJsonDocument<256> mqttstate;
-  
+
   //   JsonObject& mqttstate = jsonObject.createObject();
   mqttstate["formattedTime"] = currentState.formattedTime;
   mqttstate["batStatus"] = currentState.batStatus;
@@ -472,6 +482,10 @@ String processMainHtml(const String &var)
   {
     return inverterEnabled ? String("true") : String("false");
   }
+  else if (var == "CH_OW")
+  {
+    return String(CHARGE_OVERWRITE);
+  }
   else if (var == "SW_CH")
   {
     return chargeEnabled ? String("Off") : String("On");
@@ -486,12 +500,12 @@ String processMainHtml(const String &var)
   }
   else if (var == "DATE")
   {
-    return String(__DATE__);
-  }else if (var == "CURR_DATE")
+    return String(__DATE__) + String(" ") + String(__TIME__);
+  }
+  else if (var == "CURR_DATE")
   {
     return String(currentState.formattedTime);
   }
-
 
   return String();
 }
@@ -523,6 +537,13 @@ void prepareWebServer()
                {
     request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); 
     ESP.restart(); });
+  webserver.on("/chow140", HTTP_GET, [](AsyncWebServerRequest *request)
+               { 
+                CHARGE_OVERWRITE = 5.0 ;
+                request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); });
+  webserver.on("/chow280", HTTP_GET, [](AsyncWebServerRequest *request)
+               { CHARGE_OVERWRITE = 10.0 ; request->send(SPIFFS, "/redirect.html", String(), false, processMainHtml); });
+
   webserver.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(200, "text/plain", String(ESP.getFreeHeap())); });
   webserver.on("/espinfo", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -543,14 +564,14 @@ void prepareWebServer()
                 espinfo += "SdkVersion: " + String(ESP.getSdkVersion()) + "\n";
                 espinfo += "SketchSize: " + String(ESP.getSketchSize()) + "\n";
                 
-                request->send(200, "text/plain", espinfo); 
-                });
-               
+                request->send(200, "text/plain", espinfo); });
+
   webserver.begin();
 }
 
 void setup()
 {
+  CHARGE_OVERWRITE = 0.0;
   pinMode(22, OUTPUT); // LED
 
   Serial.begin(MONITOR_BAUDRATE);
@@ -732,9 +753,10 @@ void debugState(State *state)
 
 void doAction()
 {
-  if (currentState.processed)
+  if (currentState.processed && (CHARGE_OVERWRITE <= 0.0))
   { // value was processed
-    //   Serial.println("Nothing to process...");
+       debuglnD("Nothing to process...");
+       debugfD("CurrentState.processed: %s, CHARGE_OVERWRITE %f \n", currentState.processed ? "true" : "false", CHARGE_OVERWRITE);
   }
   else
   { // has to be process
@@ -782,107 +804,127 @@ void doAction()
       }
     }
     else
-    { // Tagsteuerung
-      debuglnV("vor SwitchRelay on,off");
-      switchRelay(true, false, &currentState);
-      debuglnV("nach SwitchRelay on,off");
-
-      // switchRelay(true, true, &currentState); //only for manual feeding
-
-      if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD) && chargeEnabled)
-      { // Einspeisung
-        debuglnV("--> Einspeisung");
+    {
+      // Tagsteuerung
+      if (CHARGE_OVERWRITE > 0.0) // charge independently
+      {
+        debuglnV("--> Zwangsladung");
 
         float isOn = dpm8624.read('p');
         float current = dpm8624.read('c');
         if (isOn == 0.0)
         { // nicht eingeschaltet
-          debuglnV("--> Einspeisung starten");
+          debuglnV("--> Zwangsladung starten");
 
-          dpm8624.write('c', 0.1);
+          dpm8624.write('c', CHARGE_OVERWRITE);
           dpm8624.power(true);
-          debuglnV("<-- Einspeisung starten");
+          debuglnV("--> Zwangsladung starten");
         }
-        else
-        {
-          debuglnV("--> Einspeisung erhöhen");
-
-          float voltage = dpm8624.read('v');
-          if (voltage < (DEFAULT_BAT_VOLTAGE - 0.2) || current < 0.2)
-          { // prevent switch to constant voltage
-            delay(10);
-            //  dpm8624.write('v', DEFAULT_BAT_VOLTAGE+0.7);
-            //  Serial.printf("setVoltage: %f\n",DEFAULT_BAT_VOLTAGE+0.7);
-            delay(10);
-          }
-
-          int faktor = (-1 * currentState.flatPower) % DEFAULT_POWER_THRESHOLD;
-          debugfV("PowerFaktor: %i\n", faktor);
-          //          current += 0.1; // gehe hoch
-          current += faktor * 0.1;
-          dpm8624.write('c', current);
-          debugfV("setCurrent: %f\n", current);
-          delay(10);
-          dpm8624.power(true);
-          debuglnV("<-- Einspeisung erhöhen");
-        }
-        debuglnV("<-- Einspeisung");
+        debuglnV("<-- Zwangsladung");
       }
       else
-      { // evtl. keine Einspeisung mehr
-        if (currentState.flatPower >= 0)
-        {
-          debuglnV("--> evtl. keine Einspeisung");
+      {
+        debuglnV("vor SwitchRelay on,off");
+        switchRelay(true, false, &currentState);
+        debuglnV("nach SwitchRelay on,off");
+
+        // switchRelay(true, true, &currentState); //only for manual feeding
+
+        if (currentState.flatPower < (-1 * DEFAULT_POWER_THRESHOLD) && chargeEnabled)
+        { // Einspeisung
+          debuglnV("--> Einspeisung");
 
           float isOn = dpm8624.read('p');
           float current = dpm8624.read('c');
-          debugfV("isOn: %f, current: %f\n", isOn, current);
-          if (isOn > 0.0)
-          { // eingeschaltet
-            if( (current >= 1.3) && (currentState.flatPower > 40) )
-            {
-              //viel Ueberschuss, großer Schritt, bessere Reaktion bei wechselnder Bewoelkung
-              debuglnV("--> Einspeisung viel erniedrigen");
+          if (isOn == 0.0)
+          { // nicht eingeschaltet
+            debuglnV("--> Einspeisung starten");
 
-              current -= 1.0;
-              dpm8624.write('c', current);
-              debuglnV("<-- Einspeisung viel erniedrigen");  
-              delay(10);
-            }
-            if (current >= 0.2)
-            { // geht noch runter
-              debuglnV("--> Einspeisung erniedrigen");
-
-              current -= 0.1;
-              dpm8624.write('c', current);
-              debuglnV("<-- Einspeisung erniedrigen");
-            }
-            else
-            {
-              debuglnV("--> Einspeisung abschalten");
-              dpm8624.power(false);
-              debuglnV("<-- Einspeisung abschalten");
-            }
+            dpm8624.write('c', 0.1);
+            dpm8624.power(true);
+            debuglnV("<-- Einspeisung starten");
           }
           else
           {
-            // fine, no lader
-            debuglnV("<--> all fine, keine Ladung");
+            debuglnV("--> Einspeisung erhöhen");
+
+            float voltage = dpm8624.read('v');
+            if (voltage < (DEFAULT_BAT_VOLTAGE - 0.2) || current < 0.2)
+            { // prevent switch to constant voltage
+              delay(10);
+              //  dpm8624.write('v', DEFAULT_BAT_VOLTAGE+0.7);
+              //  Serial.printf("setVoltage: %f\n",DEFAULT_BAT_VOLTAGE+0.7);
+              delay(10);
+            }
+
+            int faktor = (-1 * currentState.flatPower) % DEFAULT_POWER_THRESHOLD;
+            debugfV("PowerFaktor: %i\n", faktor);
+            //          current += 0.1; // gehe hoch
+            current += faktor * 0.1;
+            dpm8624.write('c', current);
+            debugfV("setCurrent: %f\n", current);
+            delay(10);
+            dpm8624.power(true);
+            debuglnV("<-- Einspeisung erhöhen");
           }
-          debuglnV("<-- keine Einspeisung");
+          debuglnV("<-- Einspeisung");
         }
         else
-        {
-          // fine, lader in optimum
-          debuglnV("<--> all fine, Ladung optimal");
+        { // evtl. keine Einspeisung mehr
+          if (currentState.flatPower >= 0)
+          {
+            debuglnV("--> evtl. keine Einspeisung");
+
+            float isOn = dpm8624.read('p');
+            float current = dpm8624.read('c');
+            debugfV("isOn: %f, current: %f\n", isOn, current);
+            if (isOn > 0.0)
+            { // eingeschaltet
+              if ((current >= 1.3) && (currentState.flatPower > 40))
+              {
+                // viel Ueberschuss, großer Schritt, bessere Reaktion bei wechselnder Bewoelkung
+                debuglnV("--> Einspeisung viel erniedrigen");
+
+                current -= 1.0;
+                dpm8624.write('c', current);
+                debuglnV("<-- Einspeisung viel erniedrigen");
+                delay(10);
+              }
+              if (current >= 0.2)
+              { // geht noch runter
+                debuglnV("--> Einspeisung erniedrigen");
+
+                current -= 0.1;
+                dpm8624.write('c', current);
+                debuglnV("<-- Einspeisung erniedrigen");
+              }
+              else
+              {
+                debuglnV("--> Einspeisung abschalten");
+                dpm8624.power(false);
+                debuglnV("<-- Einspeisung abschalten");
+              }
+            }
+            else
+            {
+              // fine, no lader
+              debuglnV("<--> all fine, keine Ladung");
+            }
+            debuglnV("<-- keine Einspeisung");
+          }
+          else
+          {
+            // fine, lader in optimum
+            debuglnV("<--> all fine, Ladung optimal");
+          }
         }
       }
-    }
-    if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE || !chargeEnabled)
-    {
-      debuglnV("--> Ladung abschalten, Bat voll");
-      dpm8624.power(false);
-      debuglnV("<-- Ladung abschalten, Bat voll");
+      if (currentState.batVoltage >= DEFAULT_BAT_VOLTAGE || !chargeEnabled)
+      {
+        debuglnV("--> Ladung abschalten, Bat voll");
+        dpm8624.power(false);
+        debuglnV("<-- Ladung abschalten, Bat voll");
+      }
     }
     esp_task_wdt_reset();
     delay(500);
@@ -891,7 +933,6 @@ void doAction()
     debugState(&currentState);
   }
 }
-
 int incomingByte = 0; // for incoming serial data
 String erg;
 
